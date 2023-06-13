@@ -1,1 +1,57 @@
-venv
+# Byte-compiled / optimized Python files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Настройки окружения и конфигурационные файлы
+.env
+*.env
+
+# Файлы логов
+logs/
+*.log
+
+# Файлы базы данных
+*.sqlite3
+
+# Файлы медиа
+media/
+
+# Статические файлы собранные Django
+staticfiles/
+
+# Виртуальное окружение Python
+venv/
+venv2/
+env/
+.venv/
+ENV/
+
+# Кэш пакетного менеджера
+.pip_cache/
+pip-wheel-metadata/
+
+# Файлы отладчика
+.vscode/
+.idea/
+
+# Файлы локализации
+locale/
+
+# Временные файлы
+*.swp
+*~
+
+# Файлы настроек редактора кода
+*.sublime-project
+*.sublime-workspace
+*.komodoproject
+.komodotools/
+.kate-swp
+
+# Файлы настроек OS X
+.DS_Store
+
+# Файлы настроек Windows
+Thumbs.db
+warehouse.iml

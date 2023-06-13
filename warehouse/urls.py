@@ -20,5 +20,6 @@ from spares import urls as spares_urls
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', include(spares_urls))
+    path('', include(spares_urls)),
+    path("__debug__/", include("debug_toolbar.urls")),
 ]
