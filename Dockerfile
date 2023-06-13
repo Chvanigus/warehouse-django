@@ -12,5 +12,9 @@ RUN pip install -r requirements.txt
 # Копирование кода проекта в Docker-контейнер
 COPY . .
 
+# Делаем миграции
+RUN python manage.py makemigrations
+RUN python manage.py migrate
+
 # Запуск команды для запуска Django-приложения
 CMD python manage.py runserver 0.0.0.0:8000
