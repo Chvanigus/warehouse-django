@@ -2,10 +2,21 @@
 import datetime
 
 from django.db import models
-from django.db.models import Sum
-from django.db.models.signals import post_save
-from django.dispatch import receiver
 from datetime import date
+
+from spares.utils import get_month_name, calculate_total_company
+
+
+class MeasureMeasurement(models.Model):
+    measure_name = models.CharField(max_length=255, verbose_name='Мера')
+
+    def __str__(self):
+        return self.measure_name
+
+    class Meta:
+        verbose_name_plural = 'Меры измерений'
+        verbose_name = 'Мера измерения'
+
 
 class Spares(models.Model):
     """Модель запчастей."""
@@ -46,6 +57,8 @@ class Company(models.Model):
 class Contractors(models.Model):
     """Модель контрагентов."""
     contractor_name = models.CharField(max_length=255, verbose_name='Контрагент')
+    contact = models.CharField(max_length=255, verbose_name='Номер телефона')
+    name = models.CharField(max_length=255, verbose_name='Имя контакта')
 
     def __str__(self):
         return self.contractor_name
@@ -68,33 +81,58 @@ class Workers(models.Model):
 
 
 class Machines(models.Model):
-    """Модель машин."""
-    machine_name = models.CharField(max_length=255, verbose_name='Машина')
+    """Модель техники."""
+    machine_name = models.CharField(max_length=255, verbose_name='Техника')
 
     def __str__(self):
         return self.machine_name
 
     class Meta:
-        verbose_name_plural = 'Машины'
-        verbose_name = 'Машина'
+        verbose_name_plural = 'Техника'
+        verbose_name = 'Техника'
+
+
+class Trailers(models.Model):
+    """Модель прицепов."""
+    trailer_name = models.CharField(max_length=255, verbose_name='Прицепное оборудование')
+
+    def __str__(self):
+        return self.trailer_name
+
+    class Meta:
+        verbose_name_plural = 'Прицепное'
+        verbose_name = 'Прицепное'
 
 
 class MachineWorker(models.Model):
-    """Модель отношения машина-работник."""
-    machine = models.ForeignKey(Machines, on_delete=models.CASCADE, verbose_name='Машина')
-    worker = models.ForeignKey(Workers, on_delete=models.CASCADE, verbose_name='Работник')
+    """Модель отношения техника-работник-прицеп."""
+    machine = models.ForeignKey(Machines, on_delete=models.CASCADE, verbose_name='Техника', null=True, blank=True)
+    worker = models.ForeignKey(Workers, on_delete=models.DO_NOTHING, verbose_name='Работник')
+    trailer = models.ForeignKey(Trailers, on_delete=models.DO_NOTHING, verbose_name='Прицепное', null=True, blank=True)
 
     def __str__(self):
-        return f"{self.machine.machine_name} - {self.worker.worker_name}"
+        if self.worker and self.trailer and self.machine:
+            return f"{self.worker.worker_name} | {self.machine.machine_name}  | {self.trailer.trailer_name}"
+        elif self.worker and self.trailer:
+            return f"{self.worker.worker_name} | {self.trailer.trailer_name}"
+        else:
+            return f"{self.worker.worker_name} | {self.machine.machine_name}"
 
     class Meta:
-        verbose_name_plural = 'Водители-транспорт'
-        verbose_name = 'Водитель-транспорт'
+        verbose_name_plural = 'Водители-транспорт-прицепы'
+        verbose_name = 'Водитель-транспорт-прицеп'
 
 
 class Receipt(models.Model):
     """Модель таблицы прихода."""
     spare = models.ForeignKey(Spares, on_delete=models.CASCADE, verbose_name='Наименование')
+    measure = models.ForeignKey(
+        MeasureMeasurement,
+        on_delete=models.DO_NOTHING,
+        verbose_name='Мера',
+        null=True,
+        blank=True
+    )
     company = models.ForeignKey(Company, on_delete=models.CASCADE, verbose_name='Фирма')
     date = models.DateField(verbose_name='Дата', default=date.today)
     warehouse = models.ForeignKey(Warehouses, on_delete=models.CASCADE, verbose_name='Склад')
@@ -107,12 +145,17 @@ class Receipt(models.Model):
 
     def save(self, *args, **kwargs):
         self.amount = self.price * self.quantity
-        super(Receipt, self).save(*args, **kwargs)
 
         if self.date and not self.year:
             self.year = self.date.year
 
-        stock, created = Stock.objects.get_or_create(spare=self.spare, warehouse=self.warehouse, price=self.price)
+        stock, created = Stock.objects.get_or_create(
+            spare=self.spare,
+            warehouse=self.warehouse,
+            price=self.price,
+            measure=self.measure,
+            company=self.company
+        )
 
         if created:
             stock.input_quantity = self.quantity
@@ -120,6 +163,7 @@ class Receipt(models.Model):
             stock.input_quantity += self.quantity
 
         stock.save()
+        super(Receipt, self).save(*args, **kwargs)
 
     class Meta:
         verbose_name_plural = 'Приход'
@@ -129,6 +173,14 @@ class Receipt(models.Model):
 class Stock(models.Model):
     """Модель таблицы остатков."""
     spare = models.ForeignKey(Spares, on_delete=models.CASCADE, verbose_name='Наименование')
+    measure = models.ForeignKey(
+        MeasureMeasurement,
+        on_delete=models.DO_NOTHING,
+        verbose_name='Мера',
+        null=True,
+        blank=True
+    )
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, verbose_name='Фирма')
     warehouse = models.ForeignKey(Warehouses, on_delete=models.CASCADE, verbose_name='Склад')
     input_quantity = models.PositiveIntegerField(default=0, verbose_name='Приход')
     output_quantity = models.PositiveIntegerField(default=0, verbose_name='Расход')
@@ -144,7 +196,15 @@ class Stock(models.Model):
         super(Stock, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.spare} | {self.actual_balance} шт. | Склад: {self.warehouse} | Цена: {self.price}"
+        if self.measure:
+            measure = f'({self.measure})'
+        else:
+            measure = ''
+        return f"{self.spare} |" \
+               f" Количество: {self.actual_balance} {measure} |" \
+               f" Склад: {self.warehouse} |" \
+               f" Цена: {self.price} |" \
+               f" Фирма: {self.company}"
 
     class Meta:
         verbose_name_plural = 'Остатки'
@@ -154,11 +214,19 @@ class Stock(models.Model):
 class WriteOff(models.Model):
     """Модель таблицы списания."""
     spare = models.ForeignKey(Spares, on_delete=models.CASCADE, verbose_name='Наименование')
-    company = models.ForeignKey(Company, on_delete=models.CASCADE, verbose_name='Фирма')
+    measure = models.ForeignKey(
+        MeasureMeasurement,
+        on_delete=models.DO_NOTHING,
+        verbose_name='Мера',
+        null=True,
+        blank=True
+    )
+    company = models.ForeignKey(Company, on_delete=models.DO_NOTHING, verbose_name='Фирма')
     date = models.DateField(verbose_name='Дата списания')
-    machine = models.ForeignKey(Machines, on_delete=models.CASCADE, verbose_name='Техника')
+    machine = models.ForeignKey(Machines, on_delete=models.DO_NOTHING, verbose_name='Техника', null=True, blank=True)
+    trailer = models.ForeignKey(Trailers, on_delete=models.DO_NOTHING, verbose_name='Прицепное', null=True, blank=True)
     worker = models.ForeignKey(Workers, on_delete=models.CASCADE, verbose_name='Механизатор')
-    warehouse = models.ForeignKey(Warehouses, on_delete=models.CASCADE, verbose_name='Склад')
+    warehouse = models.ForeignKey(Warehouses, on_delete=models.DO_NOTHING, verbose_name='Склад')
     quantity = models.PositiveIntegerField(verbose_name='Списываемое количество', default=0)
     price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='Цена', default=0)
     total_amount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='Итоговая сумма')
@@ -170,7 +238,7 @@ class WriteOff(models.Model):
         if self.date and not self.year:
             self.year = self.date.year
 
-        stock = Stock.objects.get(spare=self.spare, warehouse=self.warehouse, price=self.price)
+        stock = Stock.objects.get(spare=self.spare, warehouse=self.warehouse, price=self.price, company=self.company)
 
         if self.pk is None and stock:
             stock.output_quantity += self.quantity
@@ -195,6 +263,7 @@ class WriteOff(models.Model):
 class IncomeReport(models.Model):
     """Модель таблицы отчёта по приходу."""
     company = models.ForeignKey(Company, on_delete=models.CASCADE, verbose_name='Фирма')
+    total_company = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='Итого')
     january = models.DecimalField(verbose_name='Январь', max_digits=10, decimal_places=2, null=True, blank=True)
     february = models.DecimalField(verbose_name='Февраль', max_digits=10, decimal_places=2, null=True, blank=True)
     march = models.DecimalField(verbose_name='Март', max_digits=10, decimal_places=2, null=True, blank=True)
@@ -207,34 +276,21 @@ class IncomeReport(models.Model):
     october = models.DecimalField(verbose_name='Октябрь', max_digits=10, decimal_places=2, null=True, blank=True)
     november = models.DecimalField(verbose_name='Ноябрь', max_digits=10, decimal_places=2, null=True, blank=True)
     december = models.DecimalField(verbose_name='Декабрь', max_digits=10, decimal_places=2, null=True, blank=True)
+    year = models.IntegerField(verbose_name='Год', default=datetime.datetime.now().year)
 
     class Meta:
         verbose_name_plural = 'Отчёты по приходу'
         verbose_name = 'Отчёт по приходу'
 
-    @receiver(post_save, sender=Receipt)
-    def update_income_report(sender, instance, created, **kwargs):
-        if created or instance.date.year != instance.year:
-            report, _ = IncomeReport.objects.get_or_create(company=instance.company)
-
-            expenses = Receipt.objects.filter(company=instance.company, year=instance.date.year) \
-                .aggregate(total_price=Sum('price'))['total_price']
-
-            if expenses is not None:
-                setattr(report, instance.date.strftime('%B').lower(), expenses)
-                report.save()
-
-    @property
-    def total_company(self):
-        total = sum(
-            [getattr(self, field.name) or 0 for field in self._meta.fields if field.name not in ['id', 'company']])
-        return total
-    total_company.fget.short_description = 'Итого'
+    def save(self, *args, **kwargs):
+        self.total_company = calculate_total_company(self)
+        super(IncomeReport, self).save(*args, **kwargs)
 
 
 class OutcomeReport(models.Model):
     """Модель таблицы отчёта по расходу."""
     company = models.ForeignKey(Company, on_delete=models.CASCADE, verbose_name='Фирма')
+    total_company = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='Итого')
     january = models.DecimalField(verbose_name='Январь', max_digits=10, decimal_places=2, null=True, blank=True)
     february = models.DecimalField(verbose_name='Февраль', max_digits=10, decimal_places=2, null=True, blank=True)
     march = models.DecimalField(verbose_name='Март', max_digits=10, decimal_places=2, null=True, blank=True)
@@ -247,26 +303,13 @@ class OutcomeReport(models.Model):
     october = models.DecimalField(verbose_name='Октябрь', max_digits=10, decimal_places=2, null=True, blank=True)
     november = models.DecimalField(verbose_name='Ноябрь', max_digits=10, decimal_places=2, null=True, blank=True)
     december = models.DecimalField(verbose_name='Декабрь', max_digits=10, decimal_places=2, null=True, blank=True)
+    year = models.IntegerField(verbose_name='Год', default=datetime.datetime.now().year)
 
     class Meta:
         verbose_name_plural = 'Отчёты по расходу'
         verbose_name = 'Отчёт по расходу'
 
-    @receiver(post_save, sender=WriteOff)
-    def update_outcome_report(sender, instance, created, **kwargs):
-        if created or instance.date.year != instance.year:
-            report, _ = OutcomeReport.objects.get_or_create(company=instance.company)
+    def save(self, *args, **kwargs):
+        self.total_company = calculate_total_company(self)
+        super(OutcomeReport, self).save(*args, **kwargs)
 
-            expenses = WriteOff.objects.filter(company=instance.company, year=instance.date.year) \
-                .aggregate(total_price=Sum('price'))['total_price']
-
-            if expenses is not None:
-                setattr(report, instance.date.strftime('%B').lower(), expenses)
-                report.save()
-
-    @property
-    def total_company(self):
-        total = sum(
-            [getattr(self, field.name) or 0 for field in self._meta.fields if field.name not in ['id', 'company']])
-        return total
-    total_company.fget.short_description = 'Итого'

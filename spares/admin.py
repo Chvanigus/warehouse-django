@@ -1,9 +1,6 @@
 from django.contrib import admin
-from django.contrib.admin.views.main import ChangeList
-from django.db.models import Sum
-from django.db.models.functions import TruncMonth
-
-from .forms import WriteOffForm
+from django import forms
+from .forms import WriteOffForm, SpareSelectWidget
 from .models import *
 
 
@@ -24,7 +21,7 @@ class CompanyAdmin(admin.ModelAdmin):
 
 @admin.register(Contractors)
 class ContractorsAdmin(admin.ModelAdmin):
-    list_display = ['contractor_name']
+    list_display = ['contractor_name', 'contact', 'name']
 
 
 @admin.register(Workers)
@@ -39,13 +36,24 @@ class MachinesAdmin(admin.ModelAdmin):
 
 @admin.register(MachineWorker)
 class MachineWorkerAdmin(admin.ModelAdmin):
-    list_display = ('machine', 'worker')
+    list_display = ('worker', 'machine', 'trailer')
+
+
+@admin.register(MeasureMeasurement)
+class MeasureMeasurementAdmin(admin.ModelAdmin):
+    list_display = ['measure_name']
+
+
+@admin.register(Trailers)
+class TrailersAdmin(admin.ModelAdmin):
+    list_display = ['trailer_name']
 
 
 @admin.register(Receipt)
 class ReceiptAdmin(admin.ModelAdmin):
     list_display = (
         'spare',
+        'measure',
         'company',
         'date',
         'warehouse',
@@ -63,13 +71,27 @@ class ReceiptAdmin(admin.ModelAdmin):
         'date'
     )
     readonly_fields = ['amount']
+    formfield_overrides = {
+        models.ForeignKey: {'widget': SpareSelectWidget},
+    }
 
 
 @admin.register(Stock)
 class StockAdmin(admin.ModelAdmin):
     list_filter = ('spare', 'warehouse', 'price')
-    list_display = ('spare', 'warehouse', 'input_quantity', 'output_quantity', 'actual_balance', 'price', 'plan',
-                    'discrepancy', 'inventory')
+    list_display = (
+        'spare',
+        'measure',
+        'company',
+        'warehouse',
+        'input_quantity',
+        'output_quantity',
+        'actual_balance',
+        'price',
+        'plan',
+        'discrepancy',
+        'inventory'
+    )
 
     def has_change_permission(self, request, obj=None):
         return False
@@ -79,10 +101,12 @@ class WriteOffAdmin(admin.ModelAdmin):
     form = WriteOffForm
     list_display = (
         'spare',
+        'measure',
         'company',
         'date',
-        'machine',
         'worker',
+        'machine',
+        'trailer',
         'warehouse',
         'quantity',
         'price',
@@ -97,22 +121,9 @@ class WriteOffAdmin(admin.ModelAdmin):
         'machine',
         'worker'
     )
-
-    def get_form(self, request, obj=None, **kwargs):
-        form = super().get_form(request, obj, **kwargs)
-
-        # Обработка зависимостей полей формы
-        if request.method == 'POST' and 'spare' in request.POST:
-            spare_id = request.POST['spare']
-            stock = Stock.objects.filter(spare_id=spare_id).first()
-
-            if stock:
-                form.base_fields['warehouse'].disabled = False
-                form.base_fields['price'].disabled = False
-                form.base_fields['price'].choices = [(stock.price, stock.price)]
-                form.base_fields['available_quantity'].initial = stock.actual_balance
-
-        return form
+    formfield_overrides = {
+        forms.ModelChoiceField: {'widget': SpareSelectWidget}
+    }
 
 
 class IncomeReportsAdmin(admin.ModelAdmin):
@@ -130,7 +141,8 @@ class IncomeReportsAdmin(admin.ModelAdmin):
         'september',
         'october',
         'november',
-        'december'
+        'december',
+        'year'
     ]
 
     def has_change_permission(self, request, obj=None):
@@ -152,7 +164,8 @@ class OutcomeReportsAdmin(admin.ModelAdmin):
         'september',
         'october',
         'november',
-        'december'
+        'december',
+        'year'
     ]
 
     def has_change_permission(self, request, obj=None):
