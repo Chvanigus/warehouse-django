@@ -18,7 +18,6 @@ class WriteOffForm(forms.ModelForm):
 
     def save(self, commit=True):
         instance = super().save(commit=False)
-        print(self.cleaned_data['spares_list'].pk)
 
         instance.spare = self.cleaned_data['spares_list'].spare
         instance.warehouse = self.cleaned_data['spares_list'].warehouse
@@ -55,7 +54,7 @@ class ReceiptForm(forms.ModelForm):
 
     def save(self, commit=True):
         instance = super().save(commit=False)
-        instance.spare = self.cleaned_data['spares_list'].spare
+        instance.spare = self.cleaned_data['spares_list']
 
         if commit:
             instance.save()

@@ -1,5 +1,4 @@
 """URL configuration for warehouse project."""
-
 from django.contrib import admin
 from django.urls import path, include
 from spares import urls as spares_urls

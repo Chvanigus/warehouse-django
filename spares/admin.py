@@ -1,5 +1,4 @@
 from django.contrib import admin
-from django import forms
 from .forms import WriteOffForm, ReceiptForm
 from .models import *
 
@@ -94,6 +93,7 @@ class StockAdmin(admin.ModelAdmin):
         return False
 
 
+@admin.register(WriteOff)
 class WriteOffAdmin(admin.ModelAdmin):
     form = WriteOffForm
     list_display = (
@@ -118,54 +118,3 @@ class WriteOffAdmin(admin.ModelAdmin):
         'machine',
         'worker'
     )
-
-
-class IncomeReportsAdmin(admin.ModelAdmin):
-    list_display = [
-        'company',
-        'total_company',
-        'january',
-        'february',
-        'march',
-        'april',
-        'may',
-        'june',
-        'july',
-        'august',
-        'september',
-        'october',
-        'november',
-        'december',
-        'year'
-    ]
-
-    def has_change_permission(self, request, obj=None):
-        return False
-
-
-class OutcomeReportsAdmin(admin.ModelAdmin):
-    list_display = [
-        'company',
-        'total_company',
-        'january',
-        'february',
-        'march',
-        'april',
-        'may',
-        'june',
-        'july',
-        'august',
-        'september',
-        'october',
-        'november',
-        'december',
-        'year'
-    ]
-
-    def has_change_permission(self, request, obj=None):
-        return False
-
-
-admin.site.register(IncomeReport, IncomeReportsAdmin)
-admin.site.register(OutcomeReport, OutcomeReportsAdmin)
-admin.site.register(WriteOff, WriteOffAdmin)
