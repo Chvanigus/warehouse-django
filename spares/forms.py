@@ -1,8 +1,7 @@
 from django import forms
-from easy_select2 import Select2Mixin
 from django_select2.forms import Select2Widget
 
-from .models import WriteOff, Stock, MachineWorker
+from .models import WriteOff, Stock, MachineWorker, Spares, Receipt
 
 
 class WriteOffForm(forms.ModelForm):
@@ -47,5 +46,32 @@ class WriteOffForm(forms.ModelForm):
         fields = ['spares_list', 'date', 'quantity']
 
 
-class SpareSelectWidget(Select2Mixin, forms.Select):
-    pass
+class ReceiptForm(forms.ModelForm):
+    spares_list = forms.ModelChoiceField(
+        queryset=Spares.objects.all(),
+        label='Наименование',
+        widget=Select2Widget(),
+    )
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        instance.spare = self.cleaned_data['spares_list'].spare
+
+        if commit:
+            instance.save()
+        else:
+            return instance
+
+    class Meta:
+        model = Receipt
+        fields = [
+            'spares_list',
+            'measure',
+            'company',
+            'date',
+            'warehouse',
+            'quantity',
+            'price',
+            'invoice_number',
+            'contractor'
+        ]

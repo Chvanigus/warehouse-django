@@ -12,7 +12,7 @@ SECRET_KEY = os.getenv('SECRET_KEY')
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-DEBUG = False
+DEBUG = True
 
 # Application definition
 
@@ -119,7 +119,8 @@ if DEBUG:
 
     hostname, _, ips = socket.gethostbyname_ex(socket.gethostname())
     INTERNAL_IPS = [ip[: ip.rfind(".")] + ".1" for ip in ips] + ["127.0.0.1", "10.0.2.2"]
-    ALLOWED_HOSTS = ['127.0.0.1']
+    ALLOWED_HOSTS = ['127.0.0.1', 'warehouse.skeitax.xyz']
+    CSRF_TRUSTED_ORIGINS = ['https://warehouse.skeitax.xyz']
 else:
     ALLOWED_HOSTS = ['warehouse.skeitax.xyz']
     CSRF_TRUSTED_ORIGINS = ['https://warehouse.skeitax.xyz']

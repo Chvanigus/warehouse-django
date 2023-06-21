@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django import forms
-from .forms import WriteOffForm, SpareSelectWidget
+from .forms import WriteOffForm, ReceiptForm
 from .models import *
 
 
@@ -51,6 +51,7 @@ class TrailersAdmin(admin.ModelAdmin):
 
 @admin.register(Receipt)
 class ReceiptAdmin(admin.ModelAdmin):
+    form = ReceiptForm
     list_display = (
         'spare',
         'measure',
@@ -70,10 +71,6 @@ class ReceiptAdmin(admin.ModelAdmin):
         'company',
         'date'
     )
-    readonly_fields = ['amount']
-    formfield_overrides = {
-        models.ForeignKey: {'widget': SpareSelectWidget},
-    }
 
 
 @admin.register(Stock)
@@ -121,9 +118,6 @@ class WriteOffAdmin(admin.ModelAdmin):
         'machine',
         'worker'
     )
-    formfield_overrides = {
-        forms.ModelChoiceField: {'widget': SpareSelectWidget}
-    }
 
 
 class IncomeReportsAdmin(admin.ModelAdmin):
