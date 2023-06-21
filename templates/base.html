@@ -1,12 +1,14 @@
 {% load static %}
 
+<title>{% block title %}{% endblock title %}</title>
+
 {% block extra_css %}
-    <link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}">
+  <link rel="stylesheet" href="{% static 'libs/bootstrap/css/bootstrap.min.css' %}">
 {% endblock extra_css %}
 
 <!-- Header сайта -->
 <header>
-    {% include 'include/header.html' %}
+  {% include 'include/header.html' %}
 </header>
 <!-- Конец header -->
 
@@ -16,7 +18,8 @@
 
 {% block extra_javascript %}
 
-    <script src="{% static 'js/jquery.min.js' %}"></script>
-    <script src="{% static 'js/bootstrap.min.js' %}"></script>
+  <script src="{% static 'libs/jquery/jquery.min.js' %}"></script>
+  <script src="{% static 'libs/jquery-ui-dist/jquery-ui.min.js' %}"></script>
+  <script src="{% static 'libs/bootstrap/js/bootstrap.min.js' %}"></script>
 
 {% endblock extra_javascript %}

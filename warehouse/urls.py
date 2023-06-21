@@ -9,3 +9,7 @@ urlpatterns = [
     path("__debug__/", include("debug_toolbar.urls")),
     path("select2/", include("django_select2.urls")),
 ]
+
+# Обработчики ошибок
+handler404 = 'core.views.page_not_found'
+handler500 = 'core.views.server_error'

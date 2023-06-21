@@ -1,6 +1,9 @@
 from django.urls import path
-from spares.views import WarehouseMain
+from spares.views import WarehouseMainView, MachineReportView
+
+app_name = 'spares'
 
 urlpatterns = [
-    path('', WarehouseMain.as_view(), name='warehouse_main')
+    path('', WarehouseMainView.as_view(), name='warehouse_main'),
+    path('machine_report/', MachineReportView.as_view(), name='machine_report')
 ]

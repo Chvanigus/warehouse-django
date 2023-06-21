@@ -1,1 +1,114 @@
 {% extends 'base.html' %}
+{% load user_filters %}
+{% load static %}
+
+{% block title %}Отчёты по технике{% endblock title %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="{% static 'libs/bootstrap/css/bootstrap.min.css' %}">
+  <link rel="stylesheet" href="{% static 'libs/bootstrap-datepicker/css/bootstrap-datepicker.min.css' %}">
+  <link rel="stylesheet" href="{% static 'libs/datatables.net-bs4/css/dataTables.bootstrap4.min.css' %}">
+  <link rel="stylesheet" href="{% static 'libs/datatables.net-buttons-bs4/css/buttons.bootstrap4.min.css' %}">
+  <link rel="stylesheet" href="{% static 'libs/datatables.net-select-bs4/css/select.bootstrap4.min.css' %}">
+  <link rel="stylesheet" href="{% static 'libs/datatables.net-responsive-bs4/css/responsive.bootstrap4.min.css' %}">
+{% endblock extra_css %}
+
+{% block content %}
+  <div class="container py-5">
+    <div class="card mb-3">
+      <div class="card-body">
+        <h2 class="card-title">Отчет по технике</h2>
+        {% csrf_token %}
+        <form method="get" class="row">
+          <div class="col-md-3 mb-3">
+            <label class="form-label" for="{{ form.machine.id_for_label }}">Техника</label>
+            {{ form.machine }}
+          </div>
+          <div class="col-md-3 mb-3">
+            <label class="form-label" for="month">Выбор месяца</label>
+            <div class="position-relative" id="datepicker4">
+              <input type="text" class="form-control"
+                     data-date-container='#datepicker4'
+                     data-provide="datepicker" name="month"
+                     id="month"
+                     data-date-format="MM yyyy"
+                     data-date-min-view-mode="1"
+                     data-date-language="ru" autocomplete="off" required>
+            </div>
+          </div>
+          <div class="d-flex">
+            <div class="col-md-3 mb-3">
+              <button type="submit" class="btn btn-primary">Сформировать отчет</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+    <div class="card mb-3">
+      <div class="card-body">
+        <table class="table table-striped table-responsive" id="machine-report">
+          <thead>
+          <tr>
+            <th>Техника</th>
+            <th>Наименование</th>
+            <th>Мера</th>
+            <th>Фирма</th>
+            <th>Дата списания</th>
+            <th>Склад</th>
+            <th>Списываемое количество</th>
+            <th>Цена</th>
+            <th>Итого</th>
+          </tr>
+          </thead>
+          <tbody>
+          {% for receipt in report_data %}
+            <tr>
+              <td>{{ receipt.machine }}</td>
+              <td>{{ receipt.spare }}</td>
+              <td>{{ receipt.measure }}</td>
+              <td>{{ receipt.company }}</td>
+              <td>{{ receipt.date }}</td>
+              <td>{{ receipt.warehouse }}</td>
+              <td>{{ receipt.quantity|to_str }}</td>
+              <td>{{ receipt.price|to_str }}</td>
+              <td>{{ receipt.total_amount|to_str }}</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        <p class="text-right">Итоговая сумма:
+          {% if total_amount %}{{ total_amount }}{% else %}Нет данных{% endif %}</p>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block extra_javascript %}
+  <script src="{% static 'libs/jquery/jquery.min.js' %}"></script>
+  <script src="{% static 'libs/jquery-ui-dist/jquery-ui.min.js' %}"></script>
+  <script src="{% static 'libs/bootstrap/js/bootstrap.min.js' %}"></script>
+
+  <!-- Datepicker -->
+  <script src="{% static 'libs/bootstrap-datepicker/js/bootstrap-datepicker.min.js' %}"></script>
+  <script src="{% static 'libs/bootstrap-datepicker/locales/bootstrap-datepicker.ru.min.js' %}"></script>
+
+  <!-- Datatables -->
+  <script src="{% static 'libs/datatables.net/js/jquery.dataTables.min.js' %}"></script>
+  <script src="{% static 'libs/datatables.net-bs4/js/dataTables.bootstrap4.min.js' %}"></script>
+  <script src="{% static 'libs/datatables.net-bs4/js/dataTables.rowGroup.min.js' %}"></script>
+  <script src="{% static 'libs/datatables.net-buttons/js/dataTables.buttons.min.js' %}"></script>
+  <script src="{% static 'libs/datatables.net-buttons-bs4/js/buttons.bootstrap4.min.js' %}"></script>
+  <script src="{% static 'libs/jszip/jszip.min.js' %}"></script>
+  <script src="{% static 'libs/datatables.net-buttons/js/buttons.html5.min.js' %}"></script>
+  <script src="{% static 'libs/datatables.net-buttons/js/buttons.print.min.js' %}"></script>
+  <script src="{% static 'libs/datatables.net-buttons/js/buttons.colVis.min.js' %}"></script>
+  <script src="{% static 'libs/datatables.net-responsive/js/dataTables.responsive.min.js' %}"></script>
+  <script src="{% static 'libs/datatables.net-responsive-bs4/js/responsive.bootstrap4.min.js' %}"></script>
+  <script src="{% static 'libs/datatables.net-keytable/js/dataTables.keyTable.min.js' %}"></script>
+  <script src="{% static 'libs/datatables.net-select/js/dataTables.select.min.js' %}"></script>
+
+  <!-- Инициализация Datatables -->
+  <script id="json_url" src="{% static 'js/pages/machine-report-table.init.js' %}"
+          data-json-url="{% static 'json/russian_datatable.json' %}">
+  </script>
+{% endblock extra_javascript %}

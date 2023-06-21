@@ -1,7 +1,8 @@
 from django import forms
+from django.forms import SelectDateWidget
 from django_select2.forms import Select2Widget
 
-from .models import WriteOff, Stock, MachineWorker, Spares, Receipt
+from .models import WriteOff, Stock, MachineWorker, Spares, Receipt, Machines
 
 
 class WriteOffForm(forms.ModelForm):
@@ -74,3 +75,14 @@ class ReceiptForm(forms.ModelForm):
             'invoice_number',
             'contractor'
         ]
+
+
+class MachineReportForm(forms.Form):
+    machine = forms.ModelChoiceField(
+        queryset=Machines.objects.all(),
+        required=True,
+        label='Техника',
+        widget=forms.Select(
+            attrs={'class': 'form-control required'}
+        ),
+    )

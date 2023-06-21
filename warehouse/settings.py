@@ -12,7 +12,7 @@ SECRET_KEY = os.getenv('SECRET_KEY')
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-DEBUG = True
+DEBUG = False
 
 # Application definition
 
@@ -25,6 +25,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "spares.apps.SparesConfig",
     "reports.apps.ReportsConfig",
+    "core.apps.CoreConfig",
     "debug_toolbar",
     "django_select2",
 ]
@@ -122,5 +123,5 @@ if DEBUG:
     ALLOWED_HOSTS = ['127.0.0.1', 'warehouse.skeitax.xyz']
     CSRF_TRUSTED_ORIGINS = ['https://warehouse.skeitax.xyz']
 else:
-    ALLOWED_HOSTS = ['warehouse.skeitax.xyz']
+    ALLOWED_HOSTS = ['127.0.0.1', 'warehouse.skeitax.xyz']
     CSRF_TRUSTED_ORIGINS = ['https://warehouse.skeitax.xyz']

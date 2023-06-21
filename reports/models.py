@@ -4,7 +4,7 @@ import datetime
 from django.db import models
 
 from reports.utils import calculate_total_company
-from spares.models import Company
+from spares.models import Company, Workers
 
 
 class IncomeReport(models.Model):

@@ -80,3 +80,5 @@ def delete_stock(sender, instance, **kwargs):
         month_name = get_month_name(instance.date)
         setattr(input_, month_name, getattr(input_, month_name) - instance.amount)
         input_.save()
+
+
