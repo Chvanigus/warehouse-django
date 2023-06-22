@@ -26,7 +26,7 @@ def update_receipt():
                 warehouse_id=spare_part['warehouse'],
                 input_quantity=total_quantity,
                 measure_id=spare_part['measure'],
-                company=spare_part['company']
+                company_id=spare_part['company']
             )
 
 
