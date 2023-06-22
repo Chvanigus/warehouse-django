@@ -245,7 +245,7 @@ class WriteOff(models.Model):
                 stock.output_quantity += quantity_diff
                 stock.save()
             else:
-                stock.output_quantity = quantity_diff
+                stock.output_quantity = self.quantity
                 stock.save()
 
         super(WriteOff, self).save(*args, **kwargs)
