@@ -35,12 +35,16 @@ def update_income_report(sender, instance, created, **kwargs):
 
 @receiver(pre_delete, sender=WriteOff)
 def update_stock_outcome_report(sender, instance, **kwargs):
-    stock = Stock.objects.get(
-        spare=instance.spare,
-        warehouse=instance.warehouse,
-        price=instance.price,
-        company=instance.company
-    )
+    try:
+        stock = Stock.objects.get(
+            spare=instance.spare,
+            warehouse=instance.warehouse,
+            price=instance.price,
+            company=instance.company
+        )
+    except Stock.DoesNotExist:
+        return
+
     if stock:
         stock.output_quantity -= instance.quantity
         stock.save()
