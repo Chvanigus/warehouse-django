@@ -1,5 +1,5 @@
-from .models import WriteOff
+from .models import WriteOff, Stock
 
 for row in WriteOff.objects.all():
-    print(row)
-    row.save()
+    stock = Stock.objects.get(spare=row.spare, warehouse=row.warehouse, price=row.price, company=row.company)
+    print(stock)
