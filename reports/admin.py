@@ -23,9 +23,6 @@ class IncomeReportsAdmin(admin.ModelAdmin):
         'year'
     ]
 
-    def has_change_permission(self, request, obj=None):
-        return False
-
 
 @admin.register(OutcomeReport)
 class OutcomeReportsAdmin(admin.ModelAdmin):
@@ -46,6 +43,3 @@ class OutcomeReportsAdmin(admin.ModelAdmin):
         'december',
         'year'
     ]
-
-    def has_change_permission(self, request, obj=None):
-        return False
