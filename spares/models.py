@@ -225,15 +225,12 @@ class WriteOff(models.Model):
 
     def save(self, *args, **kwargs):
         self.total_amount = self.price * self.quantity
-        try:
-            stock = Stock.objects.get(
-                spare=self.spare,
-                warehouse=self.warehouse,
-                price=self.price,
-                company=self.company
-            )
-        except Stock.DoesNotExist:
-            return
+        stock = Stock.objects.get(
+            spare=self.spare,
+            warehouse=self.warehouse,
+            price=self.price,
+            company=self.company
+        )
 
         if self.pk is None and stock:
             stock.output_quantity += self.quantity
