@@ -77,12 +77,12 @@ class StockAdmin(admin.ModelAdmin):
     list_filter = ('spare', 'warehouse', 'price')
     list_display = (
         'spare',
+        'actual_balance',
+        'input_quantity',
+        'output_quantity',
         'measure',
         'company',
         'warehouse',
-        'input_quantity',
-        'output_quantity',
-        'actual_balance',
         'price',
         'plan',
         'discrepancy',

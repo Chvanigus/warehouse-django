@@ -1,25 +1,47 @@
 {% load static %}
 
-<title>{% block title %}{% endblock title %}</title>
+<!DOCTYPE html>
+<html lang="ru">
 
-{% block extra_css %}
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}{% endblock title %}</title>
   <link rel="stylesheet" href="{% static 'libs/bootstrap/css/bootstrap.min.css' %}">
-{% endblock extra_css %}
+  <!-- Extra CSS -->
+  {% block extra_css %}{% endblock extra_css %}
+</head>
 
-<!-- Header сайта -->
+<body>
+<!-- Предзагрузочная страница -->
+{% block preloader %}
+  {% include 'include/preloader.html' %}
+{% endblock preloader %}
+<!-- Конец предзагрузочкой страницы -->
+
+<!-- Header -->
 <header>
   {% include 'include/header.html' %}
 </header>
 <!-- Конец header -->
 
-<body>
+
 {% block content %}{% endblock content %}
+
+<!-- Footer -->
+{% block footer %}
+  {% include 'include/footer.html' %}
+{% endblock footer %}
+<!-- Конец footer -->
+
+
+<!-- JAVASCRIPT -->
+<script src="{% static 'libs/jquery/jquery.min.js' %}"></script>
+<script src="{% static 'libs/jquery-ui-dist/jquery-ui.min.js' %}"></script>
+<script src="{% static 'libs/bootstrap/js/bootstrap.min.js' %}"></script>
+
+<!-- Extra Javascript -->
+{% block extra_javascript %}{% endblock extra_javascript %}
 </body>
-
-{% block extra_javascript %}
-
-  <script src="{% static 'libs/jquery/jquery.min.js' %}"></script>
-  <script src="{% static 'libs/jquery-ui-dist/jquery-ui.min.js' %}"></script>
-  <script src="{% static 'libs/bootstrap/js/bootstrap.min.js' %}"></script>
-
-{% endblock extra_javascript %}
+</html>

@@ -9,10 +9,10 @@ from reports.models import IncomeReport, OutcomeReport
 
 @receiver(post_save, sender=WriteOff)
 def update_outcome_report(sender, instance, created, **kwargs):
-    if created or instance.date.year != instance.year:
-        report, _ = OutcomeReport.objects.get_or_create(company=instance.company)
+    if created:
+        report, _ = OutcomeReport.objects.get_or_create(company=instance.company, year=instance.date.year)
 
-        expenses = WriteOff.objects.filter(company=instance.company, year=instance.date.year) \
+        expenses = WriteOff.objects.filter(company=instance.company, date__year=instance.date.year) \
             .aggregate(total_price=Sum('total_amount'))['total_price']
 
         if expenses is not None:
@@ -22,10 +22,10 @@ def update_outcome_report(sender, instance, created, **kwargs):
 
 @receiver(post_save, sender=Receipt)
 def update_income_report(sender, instance, created, **kwargs):
-    if created or instance.date.year != instance.year:
-        report, _ = IncomeReport.objects.get_or_create(company=instance.company)
+    if created:
+        report, _ = IncomeReport.objects.get_or_create(company=instance.company, year=instance.date.year)
 
-        expenses = Receipt.objects.filter(company=instance.company, year=instance.date.year) \
+        expenses = Receipt.objects.filter(company=instance.company, date__year=instance.date.year) \
             .aggregate(total_price=Sum('amount'))['total_price']
 
         if expenses is not None:

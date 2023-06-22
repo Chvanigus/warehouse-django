@@ -137,13 +137,9 @@ class Receipt(models.Model):
     amount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='Итого')
     invoice_number = models.CharField(max_length=255, verbose_name='Номер накладной')
     contractor = models.ForeignKey(Contractors, on_delete=models.CASCADE, verbose_name='Контрагент')
-    year = models.PositiveIntegerField(verbose_name='Год', blank=True, null=True)
 
     def save(self, *args, **kwargs):
         self.amount = self.price * self.quantity
-
-        if self.date and not self.year:
-            self.year = self.date.year
 
         stock, created = Stock.objects.get_or_create(
             spare=self.spare,
@@ -226,13 +222,9 @@ class WriteOff(models.Model):
     quantity = models.PositiveIntegerField(verbose_name='Списываемое количество', default=0)
     price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='Цена', default=0)
     total_amount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='Итоговая сумма')
-    year = models.PositiveIntegerField(verbose_name='Год', blank=True, null=True)
 
     def save(self, *args, **kwargs):
         self.total_amount = self.price * self.quantity
-
-        if self.date and not self.year:
-            self.year = self.date.year
 
         stock = Stock.objects.get(spare=self.spare, warehouse=self.warehouse, price=self.price, company=self.company)
 

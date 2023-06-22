@@ -1,6 +1,6 @@
 $(document).ready(function () {
     const scriptElement = document.getElementById('json_url')
-    $('#machine-report').DataTable({
+    $('#report-datatable').DataTable({
         language: {
             url: scriptElement.getAttribute('data-json-url'),
         },

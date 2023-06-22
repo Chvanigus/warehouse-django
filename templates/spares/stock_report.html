@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+{% load user_filters %}
+{% load static %}
+
+{% block title %}Отчёт по остаткам{% endblock title %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="{% static 'libs/select2/css/select2.min.css' %}">
+  <link rel="stylesheet" href="{% static 'libs/datatables.net-bs4/css/dataTables.bootstrap4.min.css' %}">
+  <link rel="stylesheet" href="{% static 'libs/datatables.net-buttons-bs4/css/buttons.bootstrap4.min.css' %}">
+  <link rel="stylesheet" href="{% static 'libs/datatables.net-select-bs4/css/select.bootstrap4.min.css' %}">
+  <link rel="stylesheet" href="{% static 'libs/datatables.net-responsive-bs4/css/responsive.bootstrap4.min.css' %}">
+{% endblock extra_css %}
+
+{% block content %}
+  <div class="container py-5">
+    <div class="card mb-3">
+      <div class="card-body">
+        <h4 class="card-title">Отчёт по остаткам</h4>
+        <table class="table table-striped table-responsive" id="report-datatable">
+          <thead>
+          <tr>
+            <th>Наименование</th>
+            <th>Фактический остаток</th>
+            <th>Приход</th>
+            <th>Расход</th>
+            <th>Мера</th>
+            <th>Фирма</th>
+            <th>Склад</th>
+            <th>Цена</th>
+            <th>План</th>
+            <th>Расхождение с инвентаризацией</th>
+            <th>По инвентаризации</th>
+          </tr>
+          </thead>
+          <tbody>
+          {% for stock in report_data %}
+            <tr>
+              <td>{{ stock.spare }}</td>
+              <td>{{ stock.actual_balance|to_str }}</td>
+              <td>{{ stock.input_quantity|to_str }}</td>
+              <td>{{ stock.output_quantity|to_str }}</td>
+              <td>{{ stock.measure }}</td>
+              <td>{{ stock.company }}</td>
+              <td>{{ stock.warehouse }}</td>
+              <td>{{ stock.price|to_str }}</td>
+              <td>{{ stock.plan|to_str }}</td>
+              <td>{% if stock.discrepancy %}Правда{% else %}Ложь{% endif %}</td>
+              <td>{% if stock.inventory %}{{ stock.inventory|to_str }}{% else %}-------{% endif %}</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block extra_javascript %}
+
+  <!-- Datatables -->
+  <script src="{% static 'libs/datatables.net/js/jquery.dataTables.min.js' %}"></script>
+  <script src="{% static 'libs/datatables.net-bs4/js/dataTables.bootstrap4.min.js' %}"></script>
+  <script src="{% static 'libs/datatables.net-bs4/js/dataTables.rowGroup.min.js' %}"></script>
+  <script src="{% static 'libs/datatables.net-buttons/js/dataTables.buttons.min.js' %}"></script>
+  <script src="{% static 'libs/datatables.net-buttons-bs4/js/buttons.bootstrap4.min.js' %}"></script>
+  <script src="{% static 'libs/jszip/jszip.min.js' %}"></script>
+  <script src="{% static 'libs/datatables.net-buttons/js/buttons.html5.min.js' %}"></script>
+  <script src="{% static 'libs/datatables.net-buttons/js/buttons.print.min.js' %}"></script>
+  <script src="{% static 'libs/datatables.net-buttons/js/buttons.colVis.min.js' %}"></script>
+  <script src="{% static 'libs/datatables.net-responsive/js/dataTables.responsive.min.js' %}"></script>
+  <script src="{% static 'libs/datatables.net-responsive-bs4/js/responsive.bootstrap4.min.js' %}"></script>
+  <script src="{% static 'libs/datatables.net-keytable/js/dataTables.keyTable.min.js' %}"></script>
+  <script src="{% static 'libs/datatables.net-select/js/dataTables.select.min.js' %}"></script>
+
+  <!-- Инициализация Datatables -->
+  <script id="json_url" src="{% static 'js/pages/report-datatable.init.js' %}"
+          data-json-url="{% static 'json/russian_datatable.json' %}">
+  </script>
+
+{% endblock extra_javascript %}
