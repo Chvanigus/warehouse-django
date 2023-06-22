@@ -7,7 +7,4 @@ from .models import WriteOff, Stock
 class YourTestCase(TestCase):
     def test_something(self):
         for row in WriteOff.objects.all():
-            try:
-                row.save()
-            except Stock.DoesNotExist:
-                pass
+            row.save()
