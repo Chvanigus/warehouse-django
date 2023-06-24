@@ -14,3 +14,9 @@ def addclass(field, css):
 def to_str(value):
     """Конвертирует элемент в строку."""
     return str(value)
+
+
+@register.filter
+def get_item(dictionary, key):
+    """Возвращает значение по ключу."""
+    return dictionary.get(key)

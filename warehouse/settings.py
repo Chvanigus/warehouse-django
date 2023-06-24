@@ -12,7 +12,7 @@ SECRET_KEY = os.getenv('SECRET_KEY')
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-DEBUG = True
+DEBUG = False
 
 # Application definition
 
@@ -23,9 +23,8 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "spares.apps.SparesConfig",
-    "reports.apps.ReportsConfig",
     "core.apps.CoreConfig",
+    "spares.apps.SparesConfig",
     "debug_toolbar",
     "django_select2",
 ]

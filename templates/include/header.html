@@ -10,13 +10,19 @@
         <a class="nav-link" href="{% url 'admin:index' %}">Админ.панель</a>
       </li>
       <li class="nav-item">
+        <a class="nav-link" href="{% url 'spares:stock_report' %}">Отчёт по остаткам</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="{% url 'spares:income_outcome_report' %}">Приход/Расход</a>
+      </li>
+      <li class="nav-item">
         <a class="nav-link" href="{% url 'spares:machine_report' %}">Отчёт по технике</a>
       </li>
       <li class="nav-item">
         <a class="nav-link" href="{% url 'spares:trailer_report' %}">Отчёт по прицепам</a>
       </li>
       <li class="nav-item">
-        <a class="nav-link" href="{% url 'spares:stock_report' %}">Отчёт по остаткам</a>
+        <a class="nav-link" href="{% url 'spares:contractor_report' %}">Отчёт по контрагентам</a>
       </li>
     </ul>
   </div>

@@ -1,7 +1,7 @@
 from django import forms
 from django_select2.forms import Select2Widget
 
-from .models import WriteOff, Stock, MachineWorker, Spares, Receipt, Machines, Trailers
+from .models import WriteOff, Stock, MachineWorker, Receipt, Machines, Trailers, Contractors
 
 
 class WriteOffForm(forms.ModelForm):
@@ -17,28 +17,34 @@ class WriteOffForm(forms.ModelForm):
     )
 
     def save(self, commit=True):
-        instance = super().save(commit=False)
+        if self.cleaned_data.get('spares_list') and self.cleaned_data.get('machine_list'):
+            instance = super().save(commit=False)
 
-        instance.spare = self.cleaned_data['spares_list'].spare
-        instance.warehouse = self.cleaned_data['spares_list'].warehouse
-        instance.price = self.cleaned_data['spares_list'].price
-        instance.worker = self.cleaned_data['machine_list'].worker
-        instance.trailer = self.cleaned_data['machine_list'].trailer
-        instance.machine = self.cleaned_data['machine_list'].machine
-        instance.company = self.cleaned_data['spares_list'].company
-        instance.measure = self.cleaned_data['spares_list'].measure
+            instance.spare = self.cleaned_data['spares_list'].spare
+            instance.warehouse = self.cleaned_data['spares_list'].warehouse
+            instance.price = self.cleaned_data['spares_list'].price
+            instance.worker = self.cleaned_data['machine_list'].worker
+            instance.trailer = self.cleaned_data['machine_list'].trailer
+            instance.machine = self.cleaned_data['machine_list'].machine
+            instance.company = self.cleaned_data['spares_list'].company
+            instance.measure = self.cleaned_data['spares_list'].measure
 
-        if commit:
-            instance.save()
-        return instance
+            if commit:
+                instance.save()
+            return instance
+        else:
+            raise forms.ValidationError('Вы не заполнили все поля.')
 
     def clean_quantity(self):
-        actual_balance = self.cleaned_data['spares_list'].actual_balance
-        quantity = self.cleaned_data['quantity']
-        if quantity > actual_balance:
-            raise forms.ValidationError('Количество списываемых запчастей превышает доступный баланс.')
+        if self.cleaned_data.get('spares_list'):
+            actual_balance = self.cleaned_data['spares_list'].actual_balance
+            quantity = self.cleaned_data['quantity']
+            if quantity > actual_balance:
+                raise forms.ValidationError('Количество списываемых запчастей превышает доступный баланс.')
 
-        return quantity
+            return quantity
+        else:
+            raise forms.ValidationError('Вы не заполнили все поля.')
 
     class Meta:
         model = WriteOff
@@ -46,25 +52,10 @@ class WriteOffForm(forms.ModelForm):
 
 
 class ReceiptForm(forms.ModelForm):
-    spares_list = forms.ModelChoiceField(
-        queryset=Spares.objects.all(),
-        label='Наименование',
-        widget=Select2Widget(),
-    )
-
-    def save(self, commit=True):
-        instance = super().save(commit=False)
-        instance.spare = self.cleaned_data['spares_list']
-
-        if commit:
-            instance.save()
-        else:
-            return instance
-
     class Meta:
         model = Receipt
         fields = [
-            'spares_list',
+            'spare',
             'measure',
             'company',
             'date',
@@ -90,5 +81,14 @@ class TrailersReportForm(forms.Form):
         queryset=Trailers.objects.all(),
         required=True,
         label='Прицеп',
+        widget=forms.Select(attrs={'class': 'form-control'})
+    )
+
+
+class ContractorsReportForm(forms.Form):
+    contractors = forms.ModelChoiceField(
+        queryset=Contractors.objects.all(),
+        required=True,
+        label='Контрагент',
         widget=forms.Select(attrs={'class': 'form-control'})
     )

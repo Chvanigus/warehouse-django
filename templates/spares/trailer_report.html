@@ -58,38 +58,40 @@
     </div>
     <div class="card mb-3">
       <div class="card-body">
-        <table class="table table-striped table-responsive" id="report-datatable">
-          <thead>
-          <tr>
-            <th>Прицеп</th>
-            <th>Водитель</th>
-            <th>Наименование</th>
-            <th>Мера</th>
-            <th>Фирма</th>
-            <th>Дата списания</th>
-            <th>Склад</th>
-            <th>Списываемое количество</th>
-            <th>Цена</th>
-            <th>Итого</th>
-          </tr>
-          </thead>
-          <tbody>
-          {% for write_off in report_data %}
+        <div class="table-responsive">
+          <table class="table table-striped" id="report-datatable">
+            <thead>
             <tr>
-              <td>{{ write_off.trailer }}</td>
-              <td>{{ write_off.worker }}</td>
-              <td>{{ write_off.spare }}</td>
-              <td>{{ write_off.measure }}</td>
-              <td>{{ write_off.company }}</td>
-              <td>{{ write_off.date }}</td>
-              <td>{{ write_off.warehouse }}</td>
-              <td>{{ write_off.quantity|to_str }}</td>
-              <td>{{ write_off.price|to_str }}</td>
-              <td>{{ write_off.total_amount|to_str }}</td>
+              <th>Прицеп</th>
+              <th>Водитель</th>
+              <th>Наименование</th>
+              <th>Мера</th>
+              <th>Фирма</th>
+              <th>Дата списания</th>
+              <th>Склад</th>
+              <th>Списываемое количество</th>
+              <th>Цена</th>
+              <th>Итого</th>
             </tr>
-          {% endfor %}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+            {% for write_off in report_data %}
+              <tr>
+                <td>{{ write_off.trailer }}</td>
+                <td>{{ write_off.worker }}</td>
+                <td>{{ write_off.spare }}</td>
+                <td>{{ write_off.measure }}</td>
+                <td>{{ write_off.company }}</td>
+                <td>{{ write_off.date }}</td>
+                <td>{{ write_off.warehouse }}</td>
+                <td>{{ write_off.quantity|to_str }}</td>
+                <td>{{ write_off.price|to_str }}</td>
+                <td>{{ write_off.total_amount|to_str }}</td>
+              </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
         <p class="text-right">Итоговая сумма:
           {% if total_amount %}{{ total_amount }}{% else %}Нет данных{% endif %}</p>
       </div>
