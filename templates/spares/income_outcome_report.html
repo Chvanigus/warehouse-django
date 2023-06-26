@@ -33,7 +33,7 @@
             {% for data in income_report %}
               <tr>
                 <td>{{ data.company }}</td>
-                <td>{{ data.year_total }}</td>
+                <td>{{ data.year_total|round_float|to_str }}</td>
                 {% for month in months %}
                   <td>{% if data.month_totals|get_item:forloop.counter %}
                     {{ data.month_totals|get_item:forloop.counter|round_float|to_str }}{% else %}0{% endif %}</td>
@@ -63,7 +63,7 @@
             {% for data in outcome_report %}
               <tr>
                 <td>{{ data.company }}</td>
-                <td>{{ data.year_total }}</td>
+                <td>{{ data.year_total|round_float|to_str }}</td>
                 {% for month in months %}
                   <td>{% if data.month_totals|get_item:forloop.counter %}
                     {{ data.month_totals|get_item:forloop.counter|round_float|to_str }}{% else %}0{% endif %}</td>
