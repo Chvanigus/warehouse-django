@@ -62,12 +62,12 @@ class ReceiptAdmin(admin.ModelAdmin):
     list_display = (
         'spare',
         'measure',
-        'company',
-        'date',
-        'warehouse',
         'quantity',
         'price',
         'amount',
+        'company',
+        'date',
+        'warehouse',
         'invoice_number',
         'contractor'
     )
@@ -108,15 +108,15 @@ class WriteOffAdmin(admin.ModelAdmin):
     list_display = (
         'spare',
         'measure',
+        'quantity',
+        'price',
+        'total_amount',
         'company',
         'date',
         'worker',
         'machine',
         'trailer',
         'warehouse',
-        'quantity',
-        'price',
-        'total_amount'
     )
     list_filter = (
         'spare',
