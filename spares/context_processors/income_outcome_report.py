@@ -16,7 +16,7 @@ def get_income_report():
         month = row.date.month
         amount = float(row.amount)
 
-        company_data[company_id]['year_totals'][year][month] += amount
+        company_data[company_id]['year_totals'][year][month] += round(amount, 2)
 
     for company in companies:
         company_id = company['company__company_name']
@@ -52,7 +52,7 @@ def get_outcome_report():
         month = row.date.month
         amount = float(row.total_amount)
 
-        company_data[company_id]['year_totals'][year][month] += amount
+        company_data[company_id]['year_totals'][year][month] += round(amount, 2)
 
     for company in companies:
         company_id = company['company__company_name']
