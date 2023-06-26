@@ -17,6 +17,12 @@ def to_str(value):
 
 
 @register.filter
+def round_float(value):
+    """Округляет число до 2 десятичных знаков."""
+    return round(value, 2)
+
+
+@register.filter
 def get_item(dictionary, key):
     """Возвращает значение по ключу."""
     return dictionary.get(key)

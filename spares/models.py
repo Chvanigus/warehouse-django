@@ -133,8 +133,8 @@ class Receipt(models.Model):
     date = models.DateField(verbose_name='Дата', default=date.today)
     warehouse = models.ForeignKey(Warehouses, on_delete=models.CASCADE, verbose_name='Склад')
     quantity = models.FloatField(verbose_name='Количество')
-    price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='Цена')
-    amount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='Итого')
+    price = models.FloatField(verbose_name='Цена')
+    amount = models.FloatField(verbose_name='Итого')
     invoice_number = models.CharField(max_length=255, verbose_name='Номер накладной')
     contractor = models.ForeignKey(Contractors, on_delete=models.CASCADE, verbose_name='Контрагент')
 
@@ -220,8 +220,8 @@ class WriteOff(models.Model):
     worker = models.ForeignKey(Workers, on_delete=models.CASCADE, verbose_name='Механизатор')
     warehouse = models.ForeignKey(Warehouses, on_delete=models.DO_NOTHING, verbose_name='Склад')
     quantity = models.FloatField(verbose_name='Списываемое количество', default=0)
-    price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='Цена', default=0)
-    total_amount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='Итоговая сумма')
+    price = models.FloatField(verbose_name='Цена', default=0)
+    total_amount = models.FloatField(verbose_name='Итоговая сумма')
 
     def save(self, *args, **kwargs):
         self.total_amount = self.price * self.quantity
