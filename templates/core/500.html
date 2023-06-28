@@ -10,19 +10,8 @@
   <meta content="Premium Multipurpose Admin & Dashboard Template"
         name="description"/>
   <meta content="Themesdesign" name="author"/>
-  <!-- App favicon -->
-  <link rel="shortcut icon" href="{% static 'images/favicon.ico' %}">
-
-  <!-- Bootstrap Css -->
-  <link href="{% static 'css/bootstrap.min.css' %}" id="bootstrap-style"
+  <link href="{% static 'libs/bootstrap/css/bootstrap.min.css' %}" id="bootstrap-style"
         rel="stylesheet" type="text/css"/>
-  <!-- Icons Css -->
-  <link href="{% static 'css/icons.min.css' %}" rel="stylesheet"
-        type="text/css"/>
-  <!-- App Css-->
-  <link href="{% static 'css/app.min.css' %}" id="app-style" rel="stylesheet"
-        type="text/css"/>
-
 </head>
 
 <body>
@@ -40,7 +29,7 @@
           <div class="mt-5 text-center">
             <a class="btn btn-primary waves-effect
                                 waves-light"
-               href="{% url 'dashboard' %}">Вернуться на главную</a>
+               href="{% url 'spares:warehouse_main' %}">Вернуться на главную</a>
           </div>
         </div>
       </div>
@@ -50,13 +39,12 @@
 
 <!-- JAVASCRIPT -->
 <script src="{% static 'libs/jquery/jquery.min.js' %}"></script>
-<script
-  src="{% static 'libs/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
-<script src="{% static 'libs/metismenu/metisMenu.min.js' %}"></script>
-<script src="{% static 'libs/simplebar/simplebar.min.js' %}"></script>
-<script src="{% static 'libs/node-waves/waves.min.js' %}"></script>
-
-<script src="{% static 'js/app.js' %}"></script>
+<script src="{% static 'libs/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
+{#<script src="{% static 'libs/metismenu/metisMenu.min.js' %}"></script>#}
+{#<script src="{% static 'libs/simplebar/simplebar.min.js' %}"></script>#}
+{#<script src="{% static 'libs/node-waves/waves.min.js' %}"></script>#}
+{##}
+{#<script src="{% static 'js/app.js' %}"></script>#}
 
 </body>
 </html>
