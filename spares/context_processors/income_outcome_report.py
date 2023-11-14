@@ -6,12 +6,12 @@ from spares.models import Receipt, WriteOff
 def get_income_report():
     result = []
 
-    companies = Receipt.objects.values('company__company_name').distinct()
+    companies = Receipt.objects.values('company__name').distinct()
 
     company_data = defaultdict(lambda: {'year_totals': defaultdict(lambda: defaultdict(float))})
 
     for row in Receipt.objects.all():
-        company_id = row.company.company_name
+        company_id = row.company.name
         year = row.date.year
         month = row.date.month
         amount = float(row.amount)
@@ -19,7 +19,7 @@ def get_income_report():
         company_data[company_id]['year_totals'][year][month] += round(amount, 2)
 
     for company in companies:
-        company_id = company['company__company_name']
+        company_id = company['company__name']
         company_years = company_data[company_id]['year_totals']
 
         for year, month_totals in company_years.items():
@@ -36,18 +36,16 @@ def get_income_report():
 
             result.append(company_data_entry)
 
-    print(result)
-
     return result
 
 
 def get_outcome_report():
     result = []
-    companies = Receipt.objects.values('company__company_name').distinct()
+    companies = Receipt.objects.values('company__name').distinct()
     company_data = defaultdict(lambda: {'year_totals': defaultdict(lambda: defaultdict(float))})
 
     for row in WriteOff.objects.all():
-        company_id = row.company.company_name
+        company_id = row.company.name
         year = row.date.year
         month = row.date.month
         amount = float(row.total_amount)
@@ -55,7 +53,7 @@ def get_outcome_report():
         company_data[company_id]['year_totals'][year][month] += round(amount, 2)
 
     for company in companies:
-        company_id = company['company__company_name']
+        company_id = company['company__name']
         company_years = company_data[company_id]['year_totals']
 
         for year, month_totals in company_years.items():
@@ -71,7 +69,5 @@ def get_outcome_report():
             }
 
             result.append(company_data_entry)
-
-    print(result)
 
     return result

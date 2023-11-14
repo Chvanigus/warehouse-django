@@ -1,139 +1,119 @@
 """Модели приложения Spares."""
 from django.db import models
 from datetime import date
+from spares.mixins import NameMixin, CompanyMixin, SpareMixin, MeasureMixin, WarehouseMixin, \
+    MachinesWorkersTrailersMixin, PriceMixin
 
 
-class MeasureMeasurement(models.Model):
-    measure_name = models.CharField(max_length=255, verbose_name='Мера')
-
+class MeasureMeasurement(NameMixin):
+    """Модель мер измерений."""
     def __str__(self):
-        return self.measure_name
+        return self.name
 
     class Meta:
         verbose_name_plural = 'Меры измерений'
         verbose_name = 'Мера измерения'
+        managed = False
 
 
-class Spares(models.Model):
+class Spares(NameMixin):
     """Модель запчастей."""
-    spare_name = models.CharField(max_length=255, verbose_name='Наименование')
-
     def __str__(self):
-        return self.spare_name
+        return self.name
 
     class Meta:
         verbose_name_plural = 'Запчасти'
         verbose_name = 'Запчасть'
+        managed = False
 
 
-class Warehouses(models.Model):
+class Warehouses(NameMixin):
     """Модель складов."""
-    warehouse_name = models.CharField(max_length=255, verbose_name='Склад')
-
     def __str__(self):
-        return self.warehouse_name
+        return self.name
 
     class Meta:
         verbose_name_plural = 'Склады'
         verbose_name = 'Склад'
+        managed = False
 
 
-class Company(models.Model):
+class Company(NameMixin):
     """Модель фирмы."""
-    company_name = models.CharField(max_length=255, verbose_name='Фирма')
-
     def __str__(self):
-        return self.company_name
+        return self.name
 
     class Meta:
         verbose_name_plural = 'Фирмы'
         verbose_name = 'Фирма'
+        managed = False
 
 
-class Contractors(models.Model):
+class Contractors(NameMixin):
     """Модель контрагентов."""
-    contractor_name = models.CharField(max_length=255, verbose_name='Контрагент')
     contact = models.CharField(max_length=255, verbose_name='Номер телефона')
-    name = models.CharField(max_length=255, verbose_name='Имя контакта')
+    contact_name = models.CharField(max_length=255, verbose_name='Имя контакта')
 
     def __str__(self):
-        return self.contractor_name
+        return self.name
 
     class Meta:
         verbose_name_plural = 'Контрагенты'
         verbose_name = 'Контрагент'
+        managed = False
 
 
-class Workers(models.Model):
+class Workers(NameMixin):
     """Модель работников."""
-    worker_name = models.CharField(max_length=255, verbose_name='Работник')
-
     def __str__(self):
-        return self.worker_name
+        return self.name
 
     class Meta:
         verbose_name_plural = 'Работники'
         verbose_name = 'Работник'
+        managed = False
 
 
-class Machines(models.Model):
+class Machines(NameMixin):
     """Модель техники."""
-    machine_name = models.CharField(max_length=255, verbose_name='Техника')
 
     def __str__(self):
-        return self.machine_name
+        return self.name
 
     class Meta:
         verbose_name_plural = 'Техника'
         verbose_name = 'Техника'
+        managed = False
 
 
-class Trailers(models.Model):
+class Trailers(NameMixin):
     """Модель прицепов."""
-    trailer_name = models.CharField(max_length=255, verbose_name='Прицепное оборудование')
-
     def __str__(self):
-        return self.trailer_name
+        return self.name
 
     class Meta:
         verbose_name_plural = 'Прицепное'
         verbose_name = 'Прицепное'
+        managed = False
 
 
-class MachineWorker(models.Model):
+class MachineWorker(MachinesWorkersTrailersMixin):
     """Модель отношения техника-работник-прицеп."""
-    machine = models.ForeignKey(Machines, on_delete=models.CASCADE, verbose_name='Техника', null=True, blank=True)
-    worker = models.ForeignKey(Workers, on_delete=models.DO_NOTHING, verbose_name='Работник')
-    trailer = models.ForeignKey(Trailers, on_delete=models.DO_NOTHING, verbose_name='Прицепное', null=True, blank=True)
-
     def __str__(self):
-        if self.worker and self.trailer and self.machine:
-            return f"{self.worker.worker_name} | {self.machine.machine_name}  | {self.trailer.trailer_name}"
-        elif self.worker and self.trailer:
-            return f"{self.worker.worker_name} | {self.trailer.trailer_name}"
-        else:
-            return f"{self.worker.worker_name} | {self.machine.machine_name}"
+        components = [getattr(component, 'name', '') for component in [self.worker, self.machine, self.trailer]]
+        valid_components = [component for component in components if component]
+        return ' | '.join(valid_components)
 
     class Meta:
         verbose_name_plural = 'Водители-транспорт-прицепы'
         verbose_name = 'Водитель-транспорт-прицеп'
+        managed = False
 
 
-class Receipt(models.Model):
+class Receipt(CompanyMixin, SpareMixin, MeasureMixin, WarehouseMixin, PriceMixin):
     """Модель таблицы прихода."""
-    spare = models.ForeignKey(Spares, on_delete=models.CASCADE, verbose_name='Наименование')
-    measure = models.ForeignKey(
-        MeasureMeasurement,
-        on_delete=models.DO_NOTHING,
-        verbose_name='Мера',
-        null=True,
-        blank=True
-    )
-    company = models.ForeignKey(Company, on_delete=models.CASCADE, verbose_name='Фирма')
     date = models.DateField(verbose_name='Дата', default=date.today)
-    warehouse = models.ForeignKey(Warehouses, on_delete=models.CASCADE, verbose_name='Склад')
     quantity = models.DecimalField(verbose_name='Количество', max_digits=15, decimal_places=2)
-    price = models.DecimalField(verbose_name='Цена', max_digits=15, decimal_places=2)
     amount = models.DecimalField(verbose_name='Итого', max_digits=15, decimal_places=2)
     invoice_number = models.CharField(max_length=255, verbose_name='Номер накладной')
     contractor = models.ForeignKey(Contractors, on_delete=models.CASCADE, verbose_name='Контрагент')
@@ -141,9 +121,14 @@ class Receipt(models.Model):
     def save(self, *args, **kwargs):
         self.amount = self.price * self.quantity
 
+        try:
+            warehouse = Receipt.objects.get(pk=self.pk).warehouse
+        except Receipt.DoesNotExist:
+            warehouse = self.warehouse
+
         stock, created = Stock.objects.get_or_create(
             spare=self.spare,
-            warehouse=self.warehouse,
+            warehouse=warehouse,
             price=self.price,
             measure=self.measure,
             company=self.company
@@ -154,37 +139,38 @@ class Receipt(models.Model):
         else:
             stock.input_quantity += self.quantity
 
+        if warehouse != self.warehouse:
+            Movement.objects.create(
+                spare=self.spare,
+                from_warehouse=warehouse,
+                to_warehouse=self.warehouse
+            )
+            stock.warehouse = self.warehouse
+
         stock.save()
         super(Receipt, self).save(*args, **kwargs)
 
     class Meta:
         verbose_name_plural = 'Приход'
         verbose_name = 'Приход'
+        managed = False
+
+    def __str__(self):
+        return f"Приход: {self.spare} | {self.amount}"
 
 
-class Stock(models.Model):
+class Stock(SpareMixin, MeasureMixin, CompanyMixin, WarehouseMixin, PriceMixin):
     """Модель таблицы остатков."""
-    spare = models.ForeignKey(Spares, on_delete=models.CASCADE, verbose_name='Наименование')
-    measure = models.ForeignKey(
-        MeasureMeasurement,
-        on_delete=models.DO_NOTHING,
-        verbose_name='Мера',
-        null=True,
-        blank=True
-    )
-    company = models.ForeignKey(Company, on_delete=models.CASCADE, verbose_name='Фирма')
-    warehouse = models.ForeignKey(Warehouses, on_delete=models.CASCADE, verbose_name='Склад')
     input_quantity = models.DecimalField(default=0, verbose_name='Приход', max_digits=15, decimal_places=2)
     output_quantity = models.DecimalField(default=0, verbose_name='Расход', max_digits=15, decimal_places=2)
     actual_balance = models.DecimalField(default=0, verbose_name='Фактический остаток', max_digits=15, decimal_places=2)
-    price = models.DecimalField(max_digits=20, decimal_places=2, verbose_name='Цена')
     plan = models.CharField(max_length=255, blank=True, verbose_name='План')
     discrepancy = models.BooleanField(default=False, verbose_name='Расхождение с инвентаризацией')
     inventory = models.PositiveIntegerField(blank=True, null=True, verbose_name='По инвентаризации')
 
     def save(self, *args, **kwargs):
         self.actual_balance = self.input_quantity - self.output_quantity
-        self.discrepancy = True if self.inventory == self.inventory else False
+        self.discrepancy = True if self.inventory == self.actual_balance else False
         super(Stock, self).save(*args, **kwargs)
 
     def __str__(self):
@@ -201,26 +187,13 @@ class Stock(models.Model):
     class Meta:
         verbose_name_plural = 'Остатки'
         verbose_name = 'Остаток'
+        managed = False
 
 
-class WriteOff(models.Model):
+class WriteOff(MachinesWorkersTrailersMixin, WarehouseMixin, SpareMixin, MeasureMixin, CompanyMixin, PriceMixin):
     """Модель таблицы списания."""
-    spare = models.ForeignKey(Spares, on_delete=models.CASCADE, verbose_name='Наименование')
-    measure = models.ForeignKey(
-        MeasureMeasurement,
-        on_delete=models.DO_NOTHING,
-        verbose_name='Мера',
-        null=True,
-        blank=True
-    )
-    company = models.ForeignKey(Company, on_delete=models.DO_NOTHING, verbose_name='Фирма')
     date = models.DateField(verbose_name='Дата списания')
-    machine = models.ForeignKey(Machines, on_delete=models.DO_NOTHING, verbose_name='Техника', null=True, blank=True)
-    trailer = models.ForeignKey(Trailers, on_delete=models.DO_NOTHING, verbose_name='Прицепное', null=True, blank=True)
-    worker = models.ForeignKey(Workers, on_delete=models.CASCADE, verbose_name='Механизатор')
-    warehouse = models.ForeignKey(Warehouses, on_delete=models.DO_NOTHING, verbose_name='Склад')
     quantity = models.DecimalField(verbose_name='Списываемое количество', default=0, max_digits=15, decimal_places=2)
-    price = models.DecimalField(verbose_name='Цена', default=0, max_digits=15, decimal_places=2)
     total_amount = models.DecimalField(verbose_name='Итоговая сумма', max_digits=15, decimal_places=2)
 
     def save(self, *args, **kwargs):
@@ -250,3 +223,31 @@ class WriteOff(models.Model):
     class Meta:
         verbose_name_plural = 'Списания'
         verbose_name = 'Списание'
+        managed = False
+
+    def __str__(self):
+        return f'Списание запчасти: {self.spare}'
+
+
+class Movement(SpareMixin):
+    """Модель перемещений."""
+    from_warehouse = models.ForeignKey(
+        'spares.Warehouses',
+        on_delete=models.CASCADE,
+        related_name='movements_from',
+        verbose_name='Откуда'
+    )
+    to_warehouse = models.ForeignKey(
+        'spares.Warehouses',
+        on_delete=models.CASCADE,
+        related_name='movements_to',
+        verbose_name='Куда'
+    )
+    timestamp = models.DateTimeField(auto_now_add=True, verbose_name='Время перемещения')
+
+    def __str__(self):
+        return f"Из {self.from_warehouse} в {self.to_warehouse} | {self.timestamp}"
+
+    class Meta:
+        verbose_name_plural = 'Перемещения'
+        verbose_name = 'Перемещение'

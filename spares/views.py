@@ -6,7 +6,7 @@ from django.views.generic import ListView, TemplateView
 from spares.context_processors.income_outcome_report import get_income_report, get_outcome_report
 from spares.forms import MachineReportForm, TrailersReportForm, ContractorsReportForm
 from spares.models import WriteOff, Stock, Receipt
-from spares.utils import get_date_range, get_date_range_from_form
+from spares.utils import get_date_range_from_form
 
 
 class WarehouseMainView(LoginRequiredMixin, TemplateView):

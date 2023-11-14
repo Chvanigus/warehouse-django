@@ -1,59 +1,61 @@
 from django.contrib import admin
 from .forms import WriteOffForm, ReceiptForm
-from .models import *
+from .models import Spares, Warehouses, Company, Contractors, Workers, Machines, MachineWorker, MeasureMeasurement, \
+    Trailers, Receipt, Stock, WriteOff, Movement
 
 
 @admin.register(Spares)
 class SparesAdmin(admin.ModelAdmin):
-    list_display = ['spare_name']
-    search_fields = ('spare_name',)
+    list_display = ('name',)
+    search_fields = ('name',)
 
 
 @admin.register(Warehouses)
 class WarehouseAdmin(admin.ModelAdmin):
-    list_display = ['warehouse_name']
-    search_fields = ('warehouse_name',)
+    list_display = ('name',)
+    search_fields = ('name',)
 
 
 @admin.register(Company)
 class CompanyAdmin(admin.ModelAdmin):
-    list_display = ['company_name']
-    search_fields = ('company_name',)
+    list_display = ('name',)
+    search_fields = ('name',)
 
 
 @admin.register(Contractors)
 class ContractorsAdmin(admin.ModelAdmin):
-    list_display = ['contractor_name', 'contact', 'name']
-    search_fields = ('contractor_name', 'name')
+    list_display = ('name', 'contact', 'contact_name')
+    search_fields = ('name', 'contact_name')
 
 
 @admin.register(Workers)
 class WorkersAdmin(admin.ModelAdmin):
-    list_display = ['worker_name']
-    search_fields = ('worker_name',)
+    list_display = ('name',)
+    search_fields = ('name',)
 
 
 @admin.register(Machines)
 class MachinesAdmin(admin.ModelAdmin):
-    list_display = ['machine_name']
-    search_fields = ('machine_name',)
+    list_display = ('name',)
+    search_fields = ('name',)
 
 
 @admin.register(MachineWorker)
 class MachineWorkerAdmin(admin.ModelAdmin):
     list_display = ('worker', 'machine', 'trailer')
     autocomplete_fields = ('worker', 'machine', 'trailer')
+    search_fields = ('worker', 'machine', 'trailer')
 
 
 @admin.register(MeasureMeasurement)
 class MeasureMeasurementAdmin(admin.ModelAdmin):
-    list_display = ['measure_name']
+    list_display = ('name',)
 
 
 @admin.register(Trailers)
 class TrailersAdmin(admin.ModelAdmin):
-    list_display = ['trailer_name']
-    search_fields = ('trailer_name',)
+    list_display = ('name',)
+    search_fields = ('name',)
 
 
 @admin.register(Receipt)
@@ -72,18 +74,18 @@ class ReceiptAdmin(admin.ModelAdmin):
         'contractor'
     )
     list_filter = (
-        'spare',
+        'date',
         'warehouse',
-        'price',
         'company',
-        'date'
+        'contractor'
     )
+    search_fields = ('spare',)
     autocomplete_fields = ('spare', 'company', 'contractor', 'warehouse')
 
 
 @admin.register(Stock)
 class StockAdmin(admin.ModelAdmin):
-    list_filter = ('spare', 'warehouse', 'price')
+    list_filter = ('warehouse', 'company')
     list_display = (
         'spare',
         'actual_balance',
@@ -97,9 +99,18 @@ class StockAdmin(admin.ModelAdmin):
         'discrepancy',
         'inventory'
     )
-
-    def has_change_permission(self, request, obj=None):
-        return False
+    search_fields = ('spare',)
+    readonly_fields = (
+        'spare',
+        'actual_balance',
+        'input_quantity',
+        'output_quantity',
+        'measure',
+        'company',
+        'warehouse',
+        'price',
+        'discrepancy',
+    )
 
 
 @admin.register(WriteOff)
@@ -119,11 +130,16 @@ class WriteOffAdmin(admin.ModelAdmin):
         'warehouse',
     )
     list_filter = (
-        'spare',
         'warehouse',
-        'price',
         'company',
         'date',
-        'machine',
-        'worker'
     )
+
+    search_fields = ('spare',)
+
+
+@admin.register(Movement)
+class MovementAdmin(admin.ModelAdmin):
+    list_display = ('spare', 'from_warehouse', 'to_warehouse', 'timestamp')
+    search_fields = ('spare',)
+    list_filter = ('timestamp',)
