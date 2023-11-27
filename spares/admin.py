@@ -79,7 +79,7 @@ class ReceiptAdmin(admin.ModelAdmin):
         'company',
         'contractor'
     )
-    search_fields = ('spare',)
+    search_fields = ('spare__name',)
     autocomplete_fields = ('spare', 'company', 'contractor', 'warehouse')
 
 
@@ -99,16 +99,12 @@ class StockAdmin(admin.ModelAdmin):
         'discrepancy',
         'inventory'
     )
-    search_fields = ('spare',)
+    search_fields = ('spare__name',)
     readonly_fields = (
-        'spare',
-        'actual_balance',
         'input_quantity',
         'output_quantity',
-        'measure',
         'company',
         'warehouse',
-        'price',
         'discrepancy',
     )
 
@@ -135,11 +131,11 @@ class WriteOffAdmin(admin.ModelAdmin):
         'date',
     )
 
-    search_fields = ('spare',)
+    search_fields = ('spare__name',)
 
 
 @admin.register(Movement)
 class MovementAdmin(admin.ModelAdmin):
     list_display = ('spare', 'from_warehouse', 'to_warehouse', 'timestamp')
-    search_fields = ('spare',)
+    search_fields = ('spare__name',)
     list_filter = ('timestamp',)
