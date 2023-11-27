@@ -104,7 +104,6 @@ class StockAdmin(admin.ModelAdmin):
         'input_quantity',
         'output_quantity',
         'company',
-        'warehouse',
         'discrepancy',
     )
 
