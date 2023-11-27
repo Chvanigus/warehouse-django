@@ -175,7 +175,9 @@ class Stock(SpareMixin, MeasureMixin, WarehouseMixin, PriceMixin):
     inventory = models.PositiveIntegerField(blank=True, null=True, verbose_name='По инвентаризации')
 
     def save(self, *args, **kwargs):
-        self.actual_balance = self.input_quantity - self.output_quantity
+        if self.input_quantity != 0:
+            self.actual_balance = self.input_quantity - self.output_quantity
+
         self.discrepancy = True if self.inventory == self.actual_balance else False
 
         super(Stock, self).save(*args, **kwargs)
