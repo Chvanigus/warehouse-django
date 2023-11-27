@@ -104,7 +104,9 @@ class StockAdmin(admin.ModelAdmin):
         'input_quantity',
         'output_quantity',
         'discrepancy',
+        'company'
     )
+    autocomplete_fields = ('spare', 'warehouse')
 
 
 @admin.register(WriteOff)

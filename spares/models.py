@@ -159,8 +159,14 @@ class Receipt(CompanyMixin, SpareMixin, MeasureMixin, WarehouseMixin, PriceMixin
         return f"Приход: {self.spare} | {self.amount}"
 
 
-class Stock(SpareMixin, MeasureMixin, CompanyMixin, WarehouseMixin, PriceMixin):
+class Stock(SpareMixin, MeasureMixin, WarehouseMixin, PriceMixin):
     """Модель таблицы остатков."""
+    company = models.ForeignKey(
+        'spares.Company',
+        on_delete=models.CASCADE,
+        verbose_name='Фирма',
+        default=Company.objects.get(id=5)
+    )
     input_quantity = models.DecimalField(default=0, verbose_name='Приход', max_digits=15, decimal_places=2)
     output_quantity = models.DecimalField(default=0, verbose_name='Расход', max_digits=15, decimal_places=2)
     actual_balance = models.DecimalField(default=0, verbose_name='Фактический остаток', max_digits=15, decimal_places=2)
@@ -171,6 +177,7 @@ class Stock(SpareMixin, MeasureMixin, CompanyMixin, WarehouseMixin, PriceMixin):
     def save(self, *args, **kwargs):
         self.actual_balance = self.input_quantity - self.output_quantity
         self.discrepancy = True if self.inventory == self.actual_balance else False
+
         super(Stock, self).save(*args, **kwargs)
 
     def __str__(self):

@@ -18,7 +18,11 @@ class CompanyMixin(models.Model):
 
 
 class SpareMixin(models.Model):
-    spare = models.ForeignKey('spares.Spares', on_delete=models.CASCADE, verbose_name='Наименование')
+    spare = models.ForeignKey(
+        'spares.Spares',
+        on_delete=models.CASCADE,
+        verbose_name='Наименование'
+    )
 
     class Meta:
         abstract = True
