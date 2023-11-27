@@ -103,7 +103,6 @@ class StockAdmin(admin.ModelAdmin):
     readonly_fields = (
         'input_quantity',
         'output_quantity',
-        'company',
         'discrepancy',
     )
 
