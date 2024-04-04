@@ -18,6 +18,7 @@ def update_stock(sender, instance, **kwargs):
 
     if stock:
         stock.output_quantity -= instance.quantity
+        stock.actual_balance += instance.quantity
         stock.save()
 
 

@@ -177,6 +177,8 @@ class Stock(SpareMixin, MeasureMixin, WarehouseMixin, PriceMixin):
     def save(self, *args, **kwargs):
         if self.input_quantity != 0:
             self.actual_balance = self.input_quantity - self.output_quantity
+        elif self.input_quantity == 0 and self.output_quantity != 0:
+            self.actual_balance = self.actual_balance - self.output_quantity
 
         self.discrepancy = True if self.inventory == self.actual_balance else False
 
