@@ -5,7 +5,7 @@ from django.contrib.auth.models import Permission
 from django.test import TestCase
 from django.urls import reverse
 
-from spares.models import Company, Spares, Stock, Warehouses
+from spares.models import Company, Spares, Stock, StockAdjustment, Warehouses
 
 
 class CatalogTests(TestCase):
@@ -68,6 +68,7 @@ class CatalogTests(TestCase):
             'actual_balance': '4.00',
             'plan': '5',
             'inventory': '4',
+            'reason': 'Ввод начального остатка',
         }
         stock_report = reverse('spares:stock_report')
         self.assertRedirects(self.client.post(reverse('catalog:stock-add'), data), stock_report)
@@ -76,7 +77,7 @@ class CatalogTests(TestCase):
         revision = self.client.get(edit_url).context['form']['revision'].value()
         data.update(
             warehouse=other_warehouse.pk, actual_balance='6', input_quantity='999', inventory='4.25',
-            revision=revision,
+            revision=revision, reason='  Пересчёт по ведомости  ',
         )
         self.assertRedirects(self.client.post(edit_url, data), stock_report)
         stock.refresh_from_db()
@@ -85,6 +86,11 @@ class CatalogTests(TestCase):
         self.assertEqual(stock.input_quantity, 0)
         self.assertEqual(stock.inventory, Decimal('4.25'))
         self.assertTrue(stock.discrepancy)
+        opening, correction = StockAdjustment.objects.order_by('pk')
+        self.assertEqual((opening.before, opening.after), (0, 4))
+        self.assertEqual((correction.before, correction.after), (4, 6))
+        self.assertEqual(correction.actor, self.user)
+        self.assertEqual(correction.reason, 'Пересчёт по ведомости')
 
     def test_stock_form_refuses_a_stale_balance(self):
         self.grant('view_stock', 'change_stock')
@@ -100,9 +106,54 @@ class CatalogTests(TestCase):
         stock.output_quantity = 2
         stock.save(update_fields=['actual_balance', 'output_quantity'])
 
-        response = self.client.post(edit_url, {'actual_balance': '10', 'plan': '15', 'revision': revision})
+        response = self.client.post(
+            edit_url, {'actual_balance': '10', 'plan': '15', 'revision': revision, 'reason': 'Сверка'},
+        )
         self.assertContains(response, 'Откройте актуальную запись')
         self.assertEqual(response.context['form']['revision'].value(), revision)
         stock.refresh_from_db()
         self.assertEqual(stock.actual_balance, 8)
         self.assertEqual(stock.plan, '')
+        self.assertFalse(StockAdjustment.objects.exists())
+
+    def test_stock_form_requires_reason_only_when_balance_changes(self):
+        self.grant('view_stock', 'change_stock')
+        stock = Stock.objects.create(
+            warehouse=Warehouses.objects.create(name='Основной'),
+            company=Company.objects.create(name='Фирма'),
+            spare=Spares.objects.create(name='Фильтр'),
+            actual_balance=10,
+        )
+        edit_url = reverse('catalog:stock-edit', args=[stock.pk])
+        revision = self.client.get(edit_url).context['form']['revision'].value()
+        response = self.client.post(edit_url, {'actual_balance': '9.75', 'reason': '  ', 'revision': revision})
+        self.assertContains(response, 'Укажите причину изменения остатка.')
+        stock.refresh_from_db()
+        self.assertEqual(stock.actual_balance, 10)
+        self.assertRedirects(
+            self.client.post(edit_url, {'actual_balance': '10', 'inventory': '9.75', 'revision': revision}),
+            reverse('spares:stock_report'),
+        )
+        stock.refresh_from_db()
+        self.assertEqual(stock.inventory, Decimal('9.75'))
+        self.assertFalse(StockAdjustment.objects.exists())
+
+    def test_admin_stock_edit_is_audited(self):
+        administrator = get_user_model().objects.create_superuser('stock-admin', password='test-pass')
+        self.client.force_login(administrator)
+        stock = Stock.objects.create(
+            warehouse=Warehouses.objects.create(name='Основной'),
+            company=Company.objects.create(name='Фирма'),
+            spare=Spares.objects.create(name='Фильтр'),
+            actual_balance=10,
+        )
+        edit_url = reverse('admin:spares_stock_change', args=[stock.pk])
+        revision = self.client.get(edit_url).context['adminform'].form['revision'].value()
+        response = self.client.post(
+            edit_url,
+            {'actual_balance': '9.75', 'reason': 'Сверка по ведомости', 'revision': revision, '_save': '1'},
+        )
+        self.assertRedirects(response, reverse('admin:spares_stock_changelist'))
+        adjustment = StockAdjustment.objects.get(stock=stock)
+        self.assertEqual(adjustment.actor, administrator)
+        self.assertEqual((adjustment.before, adjustment.after), (10, Decimal('9.75')))

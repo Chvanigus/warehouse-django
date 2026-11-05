@@ -4,7 +4,28 @@ from django.core import signing
 from .forms import StockForm
 
 
-class StockCorrectionForm(StockForm):
+class ManualStockForm(StockForm):
+    reason = forms.CharField(
+        label='Причина корректировки',
+        max_length=500,
+        required=False,
+        widget=forms.Textarea(attrs={'rows': 3}),
+        help_text='Укажите причину, если меняете фактический остаток. Например, «Пересчёт по ведомости № 12».',
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.balance_before = self.instance.actual_balance
+
+    def clean(self):
+        data = super().clean()
+        balance = data.get('actual_balance')
+        if balance is not None and balance != self.balance_before and not data.get('reason'):
+            self.add_error('reason', 'Укажите причину изменения остатка.')
+        return data
+
+
+class StockCorrectionForm(ManualStockForm):
     revision = forms.CharField(widget=forms.HiddenInput, required=False)
     revision_salt = 'spares.stock.correction'
 

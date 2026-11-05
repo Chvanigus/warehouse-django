@@ -17,6 +17,9 @@
         <p class="muted-copy mb-0">Найдите запчасть, проверьте количество и результаты инвентаризации.</p>
       </div>
       <div class="d-flex flex-wrap gap-2">
+        {% if perms.spares.view_stockadjustment %}
+          <a class="btn btn-outline-secondary" href="{% url 'spares:stock_adjustments' %}">Журнал корректировок</a>
+        {% endif %}
         {% if perms.spares.add_stock %}
           <a class="btn btn-outline-secondary" href="{% url 'catalog:stock-add' %}">Начальный остаток</a>
         {% endif %}
@@ -80,7 +83,7 @@
                 <th scope="col" class="no-export stock-sortable">На остатке</th>
                 <th scope="col" class="no-export stock-sortable">Цена</th>
                 <th scope="col" class="no-export">Инвентаризация</th>
-                {% if perms.spares.change_stock or perms.spares.add_writeoff %}<th scope="col" class="no-export">Действия</th>{% endif %}
+                {% if perms.spares.change_stock or perms.spares.add_writeoff or perms.spares.view_stockadjustment %}<th scope="col" class="no-export">Действия</th>{% endif %}
                 <th scope="col" data-export-only hidden>Остаток</th>
                 <th scope="col" data-export-only hidden>Ед. изм.</th>
                 <th scope="col" data-export-only hidden>Цена</th>
@@ -120,7 +123,7 @@
                     {% endif %}
                     {% if stock.plan %}<span class="d-block small text-secondary">План {{ stock.plan }}</span>{% endif %}
                   </td>
-                  {% if perms.spares.change_stock or perms.spares.add_writeoff %}
+                  {% if perms.spares.change_stock or perms.spares.add_writeoff or perms.spares.view_stockadjustment %}
                     <td role="cell" class="stock-cell-actions">
                       <div class="stock-row-actions">
                         {% if perms.spares.add_writeoff and stock.actual_balance > 0 %}
@@ -128,6 +131,10 @@
                         {% endif %}
                         {% if perms.spares.change_stock %}
                           <a class="btn btn-sm btn-outline-secondary" href="{% url 'catalog:stock-edit' stock.pk %}">Сверить</a>
+                        {% endif %}
+                        {% if perms.spares.view_stockadjustment %}
+                          <a class="btn btn-sm btn-outline-secondary" href="{% url 'spares:stock_adjustments' %}?stock={{ stock.pk }}"
+                             aria-label="История корректировок по позиции «{{ stock.spare }}», {{ stock.warehouse }}">История</a>
                         {% endif %}
                       </div>
                     </td>

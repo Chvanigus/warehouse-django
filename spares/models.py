@@ -2,6 +2,7 @@
 from datetime import date
 from decimal import Decimal, ROUND_HALF_UP
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import models, router, transaction
@@ -314,6 +315,34 @@ class Stock(CompanyMixin, SpareMixin, MeasureMixin, WarehouseMixin, PriceMixin):
     class Meta:
         verbose_name_plural = 'Остатки'
         verbose_name = 'Остаток'
+
+
+class StockAdjustment(models.Model):
+    """История ручных изменений фактического остатка."""
+
+    stock = models.ForeignKey(
+        Stock, on_delete=models.SET_NULL, null=True, related_name='adjustments', verbose_name='Остаток',
+    )
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True,
+        related_name='stock_adjustments', verbose_name='Автор',
+    )
+    stock_label = models.TextField(verbose_name='Позиция на момент корректировки')
+    actor_name = models.CharField(max_length=150, verbose_name='Имя пользователя на момент корректировки')
+    before = models.DecimalField(max_digits=15, decimal_places=2, verbose_name='До корректировки')
+    after = models.DecimalField(max_digits=15, decimal_places=2, verbose_name='После корректировки')
+    reason = models.CharField(max_length=500, verbose_name='Причина')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Время корректировки')
+
+    @property
+    def delta(self):
+        return self.after - self.before
+
+    class Meta:
+        default_permissions = ('view',)
+        ordering = ('-created_at', '-pk')
+        verbose_name = 'Ручная корректировка'
+        verbose_name_plural = 'Ручные корректировки'
 
 
 class WriteOff(MachinesWorkersTrailersMixin, StockOperation):

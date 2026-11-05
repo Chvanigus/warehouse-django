@@ -8,10 +8,21 @@
       <div>
         <p class="eyebrow mb-2"><a href="{{ back_url }}">{{ catalog_name|capfirst }}</a></p>
         <h1>{{ title }}</h1>
+        {% if stock_form %}
+          <p class="muted-copy mt-2 mb-0">Изменение количества сохраняется в журнале вместе с вашей учётной записью и причиной.</p>
+        {% endif %}
       </div>
+      {% if stock_form and object and perms.spares.view_stockadjustment %}
+        <a class="btn btn-outline-secondary" href="{% url 'spares:stock_adjustments' %}?stock={{ object.pk }}">Журнал этой позиции</a>
+      {% endif %}
     </div>
     <form method="post" class="workspace-panel col-12 col-lg-7 p-3 p-md-4">
       {% csrf_token %}
+      {% if stock_form and object %}
+        <p class="mb-4">Текущий учётный остаток
+          <strong>{{ form.balance_before|floatformat:"-2" }}{% if object.measure %} {{ object.measure }}{% endif %}</strong>
+        </p>
+      {% endif %}
       {% if form.non_field_errors %}
         <div class="alert alert-danger" role="alert">{{ form.non_field_errors }}</div>
       {% endif %}

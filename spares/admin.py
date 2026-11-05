@@ -6,9 +6,11 @@ from django.db import transaction
 from django.http import HttpResponseRedirect
 from django.utils.translation import gettext_lazy as _
 
-from .forms import ReceiptForm, StockForm, WriteOffForm
+from .catalog_forms import ManualStockForm, StockCorrectionForm
+from .forms import ReceiptForm, WriteOffForm
 from .models import Spares, Warehouses, Company, Contractors, Workers, Machines, MachineWorker, MeasureMeasurement, \
     Trailers, Receipt, Stock, WriteOff, Movement
+from .stock_adjustments import save_manual_stock
 
 
 class StockOperationAdmin(admin.ModelAdmin):
@@ -123,7 +125,7 @@ class ReceiptAdmin(StockOperationAdmin):
 
 @admin.register(Stock)
 class StockAdmin(StockOperationAdmin):
-    form = StockForm
+    form = ManualStockForm
     list_filter = ('warehouse', 'company')
     list_display = (
         'spare',
@@ -149,6 +151,13 @@ class StockAdmin(StockOperationAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+    def get_form(self, request, obj=None, **kwargs):
+        kwargs['form'] = StockCorrectionForm if obj is not None else ManualStockForm
+        return super().get_form(request, obj, **kwargs)
+
+    def save_model(self, request, obj, form, change):
+        save_manual_stock(obj, actor=request.user, reason=form.cleaned_data['reason'])
 
 
 @admin.register(WriteOff)

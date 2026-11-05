@@ -1,0 +1,115 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Журнал корректировок{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/operations.css' %}">{% endblock %}
+
+{% block content %}
+  {% url 'spares:stock_adjustments' as journal_url %}
+  <main class="workspace operation-workspace">
+    <div class="page-heading operation-heading">
+      <div>
+        <p class="eyebrow mb-2">Складской учёт</p>
+        <h1>Журнал корректировок</h1>
+        <p class="muted-copy">Ручные изменения количества и ввод начальных остатков.</p>
+      </div>
+      {% if perms.spares.view_stock %}
+        <a class="btn btn-outline-primary" href="{% url 'spares:stock_report' %}">К остаткам</a>
+      {% endif %}
+    </div>
+
+    <section class="workspace-panel operation-filters" aria-label="Фильтры корректировок">
+      {% if stock_id %}
+        <p class="mb-3"><span class="badge text-bg-light">Позиция № {{ stock_id }}</span></p>
+      {% endif %}
+      {% if filters.stock.errors %}
+        <div class="alert alert-danger py-2" role="alert">Укажите корректный номер позиции.</div>
+      {% endif %}
+      <form method="get" action="{{ journal_url }}" role="search">
+        {% for field in filters.visible_fields %}
+          <div class="operation-filter">
+            <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+            {{ field }}
+            {% if field.errors %}<div class="text-danger" role="alert">{{ field.errors }}</div>{% endif %}
+          </div>
+        {% endfor %}
+        <div class="operation-filter-actions">
+          <button type="submit" class="btn btn-primary">Найти</button>
+          {% if filters.has_changed or filters.errors %}
+            <a class="btn btn-outline-secondary" href="{{ journal_url }}">Сбросить</a>
+          {% endif %}
+        </div>
+        {{ filters.stock }}
+      </form>
+    </section>
+
+    {% if entries %}
+      <section class="workspace-panel operation-journal" aria-labelledby="adjustment-entries">
+        <div class="operation-journal-head">
+          <h2 id="adjustment-entries">Записи</h2>
+          <span class="muted-copy">Найдено {{ paginator.count }}</span>
+        </div>
+        <ol class="operation-records list-unstyled mb-0">
+          {% for entry in entries %}
+            <li class="operation-record">
+              <div class="operation-record-main">
+                <time class="operation-record-date" datetime="{{ entry.created_at|date:'c' }}">
+                  {{ entry.created_at|date:'d.m.Y H:i:s' }}
+                </time>
+                <h3>{{ entry.stock_label }}</h3>
+                <p class="muted-copy">Автор {{ entry.actor_name }}</p>
+              </div>
+              <dl class="operation-record-facts">
+                <div>
+                  <dt>Было</dt>
+                  <dd class="operation-quantity">{{ entry.before|floatformat:'-2' }}</dd>
+                </div>
+                <div>
+                  <dt>Стало</dt>
+                  <dd class="operation-quantity">{{ entry.after|floatformat:'-2' }}</dd>
+                </div>
+                {% with delta=entry.delta %}
+                  <div>
+                    <dt>Изменение</dt>
+                    <dd class="operation-quantity{% if delta > 0 %} operation-quantity-in{% elif delta < 0 %} operation-quantity-out{% endif %}">
+                      {% if delta > 0 %}+{% endif %}{{ delta|floatformat:'-2' }}
+                    </dd>
+                  </div>
+                {% endwith %}
+                <div class="operation-field-wide">
+                  <dt>Причина</dt>
+                  <dd>{{ entry.reason|linebreaksbr }}</dd>
+                </div>
+              </dl>
+            </li>
+          {% endfor %}
+        </ol>
+        {% if is_paginated %}
+          <nav class="operation-pagination" aria-label="Страницы корректировок">
+            {% if page_obj.has_previous %}
+              <a class="btn btn-sm btn-outline-secondary" href="{% querystring page=page_obj.previous_page_number %}">Назад</a>
+            {% endif %}
+            <span>Страница {{ page_obj.number }} из {{ paginator.num_pages }}</span>
+            {% if page_obj.has_next %}
+              <a class="btn btn-sm btn-outline-secondary" href="{% querystring page=page_obj.next_page_number %}">Далее</a>
+            {% endif %}
+          </nav>
+        {% endif %}
+      </section>
+    {% else %}
+      <section class="workspace-panel operation-empty">
+        {% if filters.errors %}
+          <h2>Проверьте фильтры</h2>
+          <p class="muted-copy mb-0">Исправьте отмеченные поля и повторите поиск.</p>
+        {% elif filters.has_changed %}
+          <h2>Корректировки не найдены</h2>
+          <p class="muted-copy">Попробуйте изменить фильтры.</p>
+          <a class="btn btn-outline-primary" href="{{ journal_url }}">Показать все записи</a>
+        {% else %}
+          <h2>Корректировок пока нет</h2>
+          <p class="muted-copy mb-0">Запись появится после ручного изменения количества на складе.</p>
+        {% endif %}
+      </section>
+    {% endif %}
+  </main>
+{% endblock %}

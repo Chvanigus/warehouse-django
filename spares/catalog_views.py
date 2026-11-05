@@ -5,13 +5,13 @@ from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMix
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import ProtectedError, Q
-from django.http import Http404
+from django.http import Http404, HttpResponseRedirect
 from django.urls import reverse
 from django.views.generic import CreateView, DeleteView, ListView, TemplateView, UpdateView
 
 from . import models
-from .catalog_forms import StockCorrectionForm
-from .forms import StockForm
+from .catalog_forms import ManualStockForm, StockCorrectionForm
+from .stock_adjustments import save_manual_stock
 
 
 CATALOGS = {
@@ -151,7 +151,7 @@ class CatalogDeleteView(CatalogViewMixin, DeleteView):
 
 class StockFormViewMixin(LoginRequiredMixin, PermissionRequiredMixin):
     model = models.Stock
-    form_class = StockForm
+    form_class = ManualStockForm
     template_name = 'spares/catalog/form.html'
 
     def get_success_url(self):
@@ -161,7 +161,8 @@ class StockFormViewMixin(LoginRequiredMixin, PermissionRequiredMixin):
 
     def get_context_data(self, **kwargs):
         return super().get_context_data(
-            title=self.title, catalog_name='Остатки', back_url=self.get_success_url(), **kwargs,
+            title=self.title, catalog_name='Остатки', back_url=self.get_success_url(),
+            stock_form=True, **kwargs,
         )
 
     @transaction.atomic
@@ -169,13 +170,15 @@ class StockFormViewMixin(LoginRequiredMixin, PermissionRequiredMixin):
         return super().post(request, *args, **kwargs)
 
     def form_valid(self, form):
+        stock = form.save(commit=False)
         try:
-            response = super().form_valid(form)
+            save_manual_stock(stock, actor=self.request.user, reason=form.cleaned_data['reason'])
         except ValidationError as exc:
             form.add_error(None, exc.messages)
             return self.form_invalid(form)
+        self.object = stock
         messages.success(self.request, 'Остаток сохранён.')
-        return response
+        return HttpResponseRedirect(self.get_success_url())
 
 
 class StockCreateView(StockFormViewMixin, CreateView):
