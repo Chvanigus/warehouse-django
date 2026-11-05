@@ -1,46 +1,72 @@
 {% extends 'base.html' %}
+{% load static %}
 
-{% block title %}{{ list_title }}{% endblock %}
+{% block title %}{{ list_title }} · Складской учёт{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/operations.css' %}">{% endblock %}
 
 {% block content %}
-  <main class="container py-4">
-    <div class="d-flex flex-wrap align-items-center gap-3 mb-3">
-      <h1 class="mb-0">{{ list_title }}</h1>
-      {% if add_url %}<a class="btn btn-primary" href="{{ add_url }}">Добавить запись</a>{% endif %}
-    </div>
-    {% block description %}{% endblock %}
-    <form method="get" class="d-flex flex-wrap align-items-end gap-2 mb-3" role="search">
+  <main class="workspace operation-workspace">
+    {% include 'spares/operations/nav.html' %}
+    <div class="page-heading operation-heading">
       <div>
-        <label for="operation-search" class="form-label">Поиск записей</label>
-        <input type="search" name="q" id="operation-search" class="form-control" value="{{ search }}" maxlength="100">
+        <p class="eyebrow">Журнал операций</p>
+        <h1>{{ list_title }}</h1>
+        <p class="muted-copy">{% block description %}{% endblock %}</p>
       </div>
-      <button type="submit" class="btn btn-outline-primary">Найти</button>
-      {% if search %}<a href="{{ list_url }}" class="btn btn-outline-secondary">Сбросить</a>{% endif %}
-    </form>
+      {% if add_url %}<a class="btn btn-primary" href="{{ add_url }}"><span aria-hidden="true">+</span> {{ add_label }}</a>{% endif %}
+    </div>
+
+    <section class="workspace-panel operation-filters" aria-label="Фильтры журнала">
+      <form method="get" role="search">
+        {% for field in filters %}
+          <div class="operation-filter">
+            <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+            {{ field }}
+            {% if field.errors %}<div class="text-danger">{{ field.errors }}</div>{% endif %}
+          </div>
+        {% endfor %}
+        <div class="operation-filter-actions">
+          <button type="submit" class="btn btn-outline-primary">Найти</button>
+          {% if filters_active %}<a href="{{ list_url }}" class="btn btn-outline-secondary">Сбросить</a>{% endif %}
+        </div>
+      </form>
+    </section>
+
     {% if entries %}
-      <div class="table-responsive">
-        <table class="table table-striped align-middle">
-          <thead><tr>{% block headings %}{% endblock %}</tr></thead>
-          <tbody>
-            {% for entry in entries %}
-              <tr>{% block cells %}{% endblock %}</tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-      {% if is_paginated %}
-        <nav class="d-flex gap-3 align-items-center" aria-label="Страницы записей">
-          {% if page_obj.has_previous %}
-            <a href="{% querystring page=page_obj.previous_page_number %}">Назад</a>
-          {% endif %}
-          <span>Страница {{ page_obj.number }} из {{ paginator.num_pages }}</span>
-          {% if page_obj.has_next %}
-            <a href="{% querystring page=page_obj.next_page_number %}">Далее</a>
-          {% endif %}
-        </nav>
-      {% endif %}
+      <section class="workspace-panel operation-journal" aria-label="Записи журнала">
+        <div class="operation-journal-head">
+          <h2>Записи</h2>
+          <span class="muted-copy">Найдено: {{ paginator.count }}</span>
+        </div>
+        <ol class="operation-records list-unstyled mb-0">
+          {% for entry in entries %}
+            <li class="operation-record">{% block record %}{% endblock %}</li>
+          {% endfor %}
+        </ol>
+        {% if is_paginated %}
+          <nav class="operation-pagination" aria-label="Страницы записей">
+            {% if page_obj.has_previous %}
+              <a class="btn btn-sm btn-outline-secondary" href="{% querystring page=page_obj.previous_page_number %}">Назад</a>
+            {% endif %}
+            <span>Страница {{ page_obj.number }} из {{ paginator.num_pages }}</span>
+            {% if page_obj.has_next %}
+              <a class="btn btn-sm btn-outline-secondary" href="{% querystring page=page_obj.next_page_number %}">Далее</a>
+            {% endif %}
+          </nav>
+        {% endif %}
+      </section>
     {% else %}
-      <p>Записи не найдены.</p>
+      <section class="workspace-panel operation-empty">
+        {% if filters_active %}
+          <h2>Записи не найдены</h2>
+          <p class="muted-copy">Попробуйте другой запрос или измените даты.</p>
+          <a class="btn btn-outline-primary" href="{{ list_url }}">Показать все записи</a>
+        {% else %}
+          <h2>Здесь пока нет записей</h2>
+          <p class="muted-copy">{% block empty_copy %}{% endblock %}</p>
+          {% if add_url %}<a class="btn btn-outline-primary" href="{{ add_url }}">{{ add_label }}</a>{% endif %}
+        {% endif %}
+      </section>
     {% endif %}
   </main>
 {% endblock %}

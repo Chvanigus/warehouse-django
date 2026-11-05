@@ -3,15 +3,28 @@
 {% block title %}{{ title }}{% endblock %}
 {% block extra_css %}{{ form.media.css }}{% endblock %}
 {% block content %}
-  <main class="container py-4">
-    <p><a href="{{ back_url }}">{{ catalog_name|capfirst }}</a></p>
-    <h1>{{ title }}</h1>
-    <form method="post" class="col-12 col-lg-7 mt-4">
+  <main class="workspace">
+    <div class="page-heading">
+      <div>
+        <p class="eyebrow mb-2"><a href="{{ back_url }}">{{ catalog_name|capfirst }}</a></p>
+        <h1>{{ title }}</h1>
+      </div>
+    </div>
+    <form method="post" class="workspace-panel col-12 col-lg-7 p-3 p-md-4">
       {% csrf_token %}
       {% if form.non_field_errors %}
         <div class="alert alert-danger" role="alert">{{ form.non_field_errors }}</div>
       {% endif %}
-      {% for field in form %}
+      {% for field in form.hidden_fields %}
+        {{ field }}
+        {% if field.errors %}
+          <div class="alert alert-warning" role="alert">
+            {{ field.errors }}
+            {% if reload_url %}<a href="{{ reload_url }}">Открыть актуальный остаток</a>{% endif %}
+          </div>
+        {% endif %}
+      {% endfor %}
+      {% for field in form.visible_fields %}
         <div class="mb-3">
           {{ field.label_tag }}
           {{ field|addclass:"form-control" }}
@@ -19,7 +32,7 @@
           {% if field.errors %}<div class="text-danger" role="alert">{{ field.errors }}</div>{% endif %}
         </div>
       {% endfor %}
-      <button type="submit" class="btn btn-primary">Сохранить</button>
+      <button type="submit" class="btn btn-primary"{% if form.revision.errors %} disabled{% endif %}>Сохранить</button>
       <a href="{{ back_url }}" class="btn btn-outline-secondary">Отмена</a>
     </form>
   </main>

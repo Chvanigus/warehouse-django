@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.test import TestCase
@@ -70,9 +72,37 @@ class CatalogTests(TestCase):
         stock_report = reverse('spares:stock_report')
         self.assertRedirects(self.client.post(reverse('catalog:stock-add'), data), stock_report)
         stock = Stock.objects.get()
-        data.update(warehouse=other_warehouse.pk, actual_balance='6', input_quantity='999')
-        self.assertRedirects(self.client.post(reverse('catalog:stock-edit', args=[stock.pk]), data), stock_report)
+        edit_url = reverse('catalog:stock-edit', args=[stock.pk])
+        revision = self.client.get(edit_url).context['form']['revision'].value()
+        data.update(
+            warehouse=other_warehouse.pk, actual_balance='6', input_quantity='999', inventory='4.25',
+            revision=revision,
+        )
+        self.assertRedirects(self.client.post(edit_url, data), stock_report)
         stock.refresh_from_db()
         self.assertEqual(stock.warehouse_id, warehouse.pk)
         self.assertEqual(stock.actual_balance, 6)
         self.assertEqual(stock.input_quantity, 0)
+        self.assertEqual(stock.inventory, Decimal('4.25'))
+        self.assertTrue(stock.discrepancy)
+
+    def test_stock_form_refuses_a_stale_balance(self):
+        self.grant('view_stock', 'change_stock')
+        stock = Stock.objects.create(
+            warehouse=Warehouses.objects.create(name='Основной'),
+            company=Company.objects.create(name='Фирма'),
+            spare=Spares.objects.create(name='Фильтр'),
+            actual_balance=10,
+        )
+        edit_url = reverse('catalog:stock-edit', args=[stock.pk])
+        revision = self.client.get(edit_url).context['form']['revision'].value()
+        stock.actual_balance = 8
+        stock.output_quantity = 2
+        stock.save(update_fields=['actual_balance', 'output_quantity'])
+
+        response = self.client.post(edit_url, {'actual_balance': '10', 'plan': '15', 'revision': revision})
+        self.assertContains(response, 'Откройте актуальную запись')
+        self.assertEqual(response.context['form']['revision'].value(), revision)
+        stock.refresh_from_db()
+        self.assertEqual(stock.actual_balance, 8)
+        self.assertEqual(stock.plan, '')

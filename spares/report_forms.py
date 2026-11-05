@@ -4,7 +4,7 @@ from datetime import date
 
 from django import forms
 
-from spares.models import Contractors, Machines, Trailers
+from spares.models import Company, Contractors, Machines, Trailers, Warehouses
 
 
 RUSSIAN_MONTHS = (
@@ -84,4 +84,34 @@ class ContractorsReportForm(ReportFilterForm):
         queryset=Contractors.objects.order_by('name', 'pk'),
         label='Контрагент',
         widget=forms.Select(attrs={'class': 'form-select warehouse-choice'}),
+    )
+
+
+class StockFilterForm(forms.Form):
+    q = forms.CharField(
+        label='Запчасть',
+        max_length=255,
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control', 'type': 'search', 'placeholder': 'Например, масляный фильтр',
+        }),
+    )
+    warehouse = forms.ModelChoiceField(
+        queryset=Warehouses.objects.order_by('name', 'pk'),
+        label='Склад',
+        required=False,
+        empty_label='Все склады',
+        widget=forms.Select(attrs={'class': 'form-select'}),
+    )
+    company = forms.ModelChoiceField(
+        queryset=Company.objects.order_by('name', 'pk'),
+        label='Фирма',
+        required=False,
+        empty_label='Все фирмы',
+        widget=forms.Select(attrs={'class': 'form-select'}),
+    )
+    discrepancy = forms.BooleanField(
+        label='Только расхождения',
+        required=False,
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
     )

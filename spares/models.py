@@ -212,7 +212,10 @@ class Stock(CompanyMixin, SpareMixin, MeasureMixin, WarehouseMixin, PriceMixin):
     actual_balance = models.DecimalField(default=0, verbose_name='Фактический остаток', max_digits=15, decimal_places=2)
     plan = models.CharField(max_length=255, blank=True, verbose_name='План')
     discrepancy = models.BooleanField(default=False, verbose_name='Расхождение с инвентаризацией')
-    inventory = models.PositiveIntegerField(blank=True, null=True, verbose_name='По инвентаризации')
+    inventory = models.DecimalField(
+        blank=True, null=True, max_digits=15, decimal_places=2, verbose_name='По инвентаризации',
+        validators=[MinValueValidator(Decimal('0.00'))],
+    )
 
     @classmethod
     def key_for(cls, item):

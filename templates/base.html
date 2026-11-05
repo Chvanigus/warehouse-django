@@ -7,9 +7,11 @@
   <title>{% block title %}Складской учёт{% endblock %}</title>
   <link rel="icon" href="{% static 'images/warehouse.svg' %}">
   <link rel="stylesheet" href="{% static 'libs/bootstrap/css/bootstrap.min.css' %}">
+  <link rel="stylesheet" href="{% static 'css/warehouse.css' %}">
   {% block extra_css %}{% endblock %}
 </head>
 <body>
+  <a class="visually-hidden-focusable skip-link" href="#main-content">К содержимому</a>
   {% include 'include/header.html' %}
   {% if messages %}
     <div class="container pt-3">
@@ -18,7 +20,9 @@
       {% endfor %}
     </div>
   {% endif %}
-  {% block content %}{% endblock %}
+  <div id="main-content" tabindex="-1">
+    {% block content %}{% endblock %}
+  </div>
   <script src="{% static 'libs/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
   {% block extra_javascript %}{% endblock %}
 </body>

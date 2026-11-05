@@ -1,13 +1,23 @@
 {% extends 'base.html' %}
 {% block title %}Справочники{% endblock %}
 {% block content %}
-  <main class="container py-4">
-    <h1 class="mb-4">Справочники</h1>
-    <div class="list-group">
+  <main class="workspace">
+    <div class="page-heading">
+      <div>
+        <p class="eyebrow mb-2">Настройка склада</p>
+        <h1>Справочники</h1>
+      </div>
+    </div>
+    <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 g-3">
       {% for slug, name in catalogs %}
-        <a class="list-group-item list-group-item-action" href="{% url 'catalog:list' slug %}">{{ name|capfirst }}</a>
+        <div class="col">
+          <a class="workspace-panel d-flex gap-3 justify-content-between align-items-center h-100 p-3"
+             href="{% url 'catalog:list' slug %}">
+            {{ name|capfirst }} {% include 'include/icon.html' with name='arrow' only %}
+          </a>
+        </div>
       {% empty %}
-        <p>У вас пока нет доступа к справочникам.</p>
+        <p class="col">У вас пока нет доступа к справочникам.</p>
       {% endfor %}
     </div>
   </main>

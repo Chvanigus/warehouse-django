@@ -1,6 +1,6 @@
 from django.urls import path
 
-from .forms import ReceiptForm, WriteOffForm
+from .forms import OperationReceiptForm, OperationWriteOffForm
 from .models import Movement, Receipt, WriteOff
 from .operation_views import (
     OperationCreateView,
@@ -16,10 +16,12 @@ urlpatterns = [
         'receipts/',
         OperationListView.as_view(
             model=Receipt,
-            list_title='Приходы',
+            list_title='Приход',
             related_fields=('spare', 'measure', 'company', 'warehouse', 'contractor'),
             order_by=('-date', '-pk'),
-            search_fields=('spare__name', 'invoice_number', 'warehouse__name', 'contractor__name'),
+            search_fields=('spare__name', 'invoice_number', 'warehouse__name', 'contractor__name', 'company__name'),
+            search_hint='Запчасть, накладная, склад или поставщик',
+            add_label='Оформить приход',
             template_name='spares/operations/receipts.html',
         ),
         name='receipts',
@@ -28,10 +30,12 @@ urlpatterns = [
         'writeoffs/',
         OperationListView.as_view(
             model=WriteOff,
-            list_title='Списания',
+            list_title='Расход',
             related_fields=('spare', 'measure', 'warehouse', 'company', 'worker', 'machine', 'trailer'),
             order_by=('-date', '-pk'),
             search_fields=('spare__name', 'warehouse__name', 'worker__name', 'machine__name', 'trailer__name'),
+            search_hint='Запчасть, склад, работник или техника',
+            add_label='Оформить списание',
             template_name='spares/operations/writeoffs.html',
         ),
         name='writeoffs',
@@ -44,6 +48,8 @@ urlpatterns = [
             related_fields=('spare', 'from_warehouse', 'to_warehouse'),
             order_by=('-timestamp', '-pk'),
             search_fields=('spare__name', 'from_warehouse__name', 'to_warehouse__name'),
+            search_hint='Запчасть или склад',
+            date_field='timestamp__date',
             template_name='spares/operations/movements.html',
             allow_add=False,
         ),
@@ -52,8 +58,8 @@ urlpatterns = [
 ]
 
 for model, form_class, title in (
-    (Receipt, ReceiptForm, 'Приходы'),
-    (WriteOff, WriteOffForm, 'Списания'),
+    (Receipt, OperationReceiptForm, 'Приход'),
+    (WriteOff, OperationWriteOffForm, 'Расход'),
 ):
     name = model._meta.model_name
     prefix = f'{name}s/'

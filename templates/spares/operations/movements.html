@@ -1,19 +1,23 @@
 {% extends 'spares/operations/list.html' %}
 
-{% block description %}
-  <p>Здесь отображаются перемещения, созданные при изменении склада в записи о приходе.</p>
-{% endblock %}
+{% block description %}История смены склада в приходных записях.{% endblock %}
+{% block empty_copy %}Запись появится после смены склада в оформленном приходе.{% endblock %}
 
-{% block headings %}
-  <th scope="col">Дата и время</th>
-  <th scope="col">Запчасть</th>
-  <th scope="col">Склад-отправитель</th>
-  <th scope="col">Склад-получатель</th>
-{% endblock %}
-
-{% block cells %}
-  <td>{{ entry.timestamp|date:"d.m.Y H:i" }}</td>
-  <td>{{ entry.spare }}</td>
-  <td>{{ entry.from_warehouse }}</td>
-  <td>{{ entry.to_warehouse }}</td>
+{% block record %}
+  <div class="operation-record-main">
+    <p class="operation-record-date">
+      <time datetime="{{ entry.timestamp|date:'c' }}">{{ entry.timestamp|date:'d.m.Y H:i' }}</time>
+    </p>
+    <h3>{{ entry.spare }}</h3>
+  </div>
+  <dl class="operation-record-facts">
+    <div>
+      <dt>Откуда</dt>
+      <dd>{{ entry.from_warehouse }}</dd>
+    </div>
+    <div>
+      <dt>Куда</dt>
+      <dd>{{ entry.to_warehouse }}</dd>
+    </div>
+  </dl>
 {% endblock %}

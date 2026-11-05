@@ -1,27 +1,32 @@
 {% extends 'spares/operations/list.html' %}
 
-{% block headings %}
-  <th scope="col">Дата</th>
-  <th scope="col">Запчасть</th>
-  <th scope="col">Склад / фирма</th>
-  <th scope="col">Количество</th>
-  <th scope="col">Цена</th>
-  <th scope="col">Сумма</th>
-  <th scope="col">Работник</th>
-  <th scope="col">Техника</th>
-  <th scope="col">Прицеп</th>
-  {% if can_change or can_delete %}<th scope="col">Действия</th>{% endif %}
-{% endblock %}
+{% block description %}Списания запчастей по складам, работникам и технике.{% endblock %}
+{% block empty_copy %}Оформленные списания будут видны в этом журнале.{% endblock %}
 
-{% block cells %}
-  <td>{{ entry.date|date:"d.m.Y" }}</td>
-  <td>{{ entry.spare }}</td>
-  <td>{{ entry.warehouse }} / {{ entry.company }}</td>
-  <td>{{ entry.quantity }} {{ entry.measure|default_if_none:"" }}</td>
-  <td>{{ entry.price }}</td>
-  <td>{{ entry.total_amount }}</td>
-  <td>{{ entry.worker }}</td>
-  <td>{{ entry.machine|default_if_none:"—" }}</td>
-  <td>{{ entry.trailer|default_if_none:"—" }}</td>
+{% block record %}
+  <div class="operation-record-main">
+    <p class="operation-record-date">
+      <time datetime="{{ entry.date|date:'Y-m-d' }}">{{ entry.date|date:'d.m.Y' }}</time>
+      <span>· Списание № {{ entry.pk }}</span>
+    </p>
+    <h3>{{ entry.spare }}</h3>
+    <p class="muted-copy">{{ entry.worker }}{% if entry.machine %} · {{ entry.machine }}{% endif %}{% if entry.trailer %} · {{ entry.trailer }}{% endif %}</p>
+  </div>
+  <dl class="operation-record-facts">
+    <div>
+      <dt>Склад</dt>
+      <dd>{{ entry.warehouse }}</dd>
+      <dd class="muted-copy">{{ entry.company }}</dd>
+    </div>
+    <div>
+      <dt>Количество</dt>
+      <dd class="operation-quantity operation-quantity-out">−{{ entry.quantity|floatformat:'-2' }} {{ entry.measure|default_if_none:'' }}</dd>
+      <dd class="muted-copy">Цена {{ entry.price|floatformat:'2' }}</dd>
+    </div>
+    <div>
+      <dt>Сумма</dt>
+      <dd class="operation-total">{{ entry.total_amount|floatformat:'2' }}</dd>
+    </div>
+  </dl>
   {% include 'spares/operations/actions.html' %}
 {% endblock %}

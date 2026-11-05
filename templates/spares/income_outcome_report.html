@@ -3,8 +3,13 @@
 {% block title %}Отчёт по приходу и расходу{% endblock %}
 
 {% block content %}
-  <main class="container-fluid px-4 py-4">
-    <h1 class="h2 mb-3">Приход и расход</h1>
+  <main class="workspace">
+    <div class="page-heading">
+      <div>
+        <p class="eyebrow mb-2">Отчёты</p>
+        <h1>Приход и расход в денежном выражении</h1>
+      </div>
+    </div>
     {% include 'spares/monthly_totals.html' with heading='Приход' report=income_report %}
     {% include 'spares/monthly_totals.html' with heading='Расход' report=outcome_report %}
   </main>

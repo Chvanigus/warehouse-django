@@ -10,6 +10,7 @@ from django.urls import reverse
 from django.views.generic import CreateView, DeleteView, ListView, TemplateView, UpdateView
 
 from . import models
+from .catalog_forms import StockCorrectionForm
 from .forms import StockForm
 
 
@@ -183,5 +184,9 @@ class StockCreateView(StockFormViewMixin, CreateView):
 
 
 class StockUpdateView(StockFormViewMixin, UpdateView):
+    form_class = StockCorrectionForm
     permission_required = 'spares.change_stock'
     title = 'Корректировка остатка'
+
+    def get_context_data(self, **kwargs):
+        return super().get_context_data(reload_url=self.request.path, **kwargs)

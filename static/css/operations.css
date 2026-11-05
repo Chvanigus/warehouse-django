@@ -1,0 +1,340 @@
+.operation-workspace {
+  --operation-line: #dce5ee;
+  --operation-muted: #516477;
+  --operation-blue: #1e58b5;
+}
+
+.operation-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .3rem;
+  margin-bottom: 1.25rem;
+}
+
+.operation-nav a {
+  padding: .45rem .8rem;
+  border: 1px solid transparent;
+  border-radius: .55rem;
+  color: var(--operation-muted);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.operation-nav a:hover,
+.operation-nav a[aria-current="page"] {
+  border-color: #c8dcf4;
+  background: #e7f0ff;
+  color: var(--operation-blue);
+}
+
+.operation-heading {
+  margin-bottom: 1.25rem;
+}
+
+.operation-heading .muted-copy {
+  margin: .3rem 0 0;
+}
+
+.operation-filters {
+  margin-bottom: 1rem;
+  padding: 1rem;
+}
+
+.operation-filters form {
+  display: grid;
+  grid-template-columns: minmax(12rem, 2fr) repeat(2, minmax(8rem, 1fr)) auto;
+  align-items: start;
+  gap: .75rem;
+}
+
+.operation-filter {
+  min-width: 0;
+}
+
+.operation-filter-actions,
+.operation-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+}
+
+.operation-filter-actions {
+  padding-top: 1.9rem;
+}
+
+.operation-journal-head,
+.operation-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .75rem;
+  padding: .95rem 1.15rem;
+}
+
+.operation-journal-head {
+  justify-content: space-between;
+}
+
+.operation-journal-head h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.operation-record {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 2fr) auto;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.15rem;
+  border-top: 1px solid var(--operation-line);
+}
+
+.operation-record-main,
+.operation-record-facts div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.operation-record h3 {
+  margin: .18rem 0 .2rem;
+  font-size: 1.08rem;
+}
+
+.operation-record p {
+  margin: 0;
+}
+
+.operation-record-date {
+  color: var(--operation-muted);
+  font-size: .82rem;
+  font-weight: 600;
+}
+
+.operation-record-facts {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, .85fr);
+  gap: .7rem;
+  margin: 0;
+}
+
+.operation-record-facts dt {
+  color: var(--operation-muted);
+  font-size: .78rem;
+  font-weight: 600;
+}
+
+.operation-record-facts dd {
+  margin: 0;
+}
+
+.operation-record-facts .muted-copy {
+  font-size: .85rem;
+}
+
+.operation-record-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: .4rem;
+}
+
+.operation-quantity,
+.operation-total {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.operation-quantity-in {
+  color: #16634f;
+}
+
+.operation-quantity-out {
+  color: #994725;
+}
+
+.operation-pagination {
+  border-top: 1px solid var(--operation-line);
+}
+
+.operation-empty {
+  padding: 2.1rem 1rem;
+  text-align: center;
+}
+
+.operation-empty h2,
+.operation-confirm h2,
+.operation-form-panel h2,
+.operation-summary h2 {
+  margin: 0 0 .85rem;
+  font-size: 1.14rem;
+}
+
+.operation-form-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(16rem, 1fr);
+  align-items: start;
+  gap: 1rem;
+}
+
+.operation-form-main {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.operation-form-panel,
+.operation-confirm,
+.operation-summary {
+  padding: 1.15rem;
+}
+
+.operation-confirm {
+  max-width: 42rem;
+}
+
+.operation-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .9rem;
+}
+
+.operation-field-wide {
+  grid-column: 1 / -1;
+}
+
+.operation-required {
+  color: #a23827;
+}
+
+.operation-field ul,
+.operation-filter ul,
+.operation-workspace .alert ul {
+  margin: .25rem 0 0;
+  padding-left: 1.25rem;
+}
+
+.operation-summary dl > div:not([hidden]) {
+  display: flex;
+  justify-content: space-between;
+  gap: .65rem;
+  margin-bottom: .5rem;
+}
+
+.operation-summary dt {
+  font-weight: 500;
+  color: var(--operation-muted);
+}
+
+.operation-summary dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-align: end;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.operation-summary .operation-summary-total {
+  padding-top: .8rem;
+  border-top: 1px solid var(--operation-line);
+  font-size: 1.2rem;
+}
+
+.operation-summary .muted-copy {
+  margin: 0;
+  font-size: .88rem;
+}
+
+.operation-balance-warning {
+  padding: .55rem .7rem;
+  border-radius: .5rem;
+  background: #fff0db;
+  color: #7e4209;
+  font-size: .9rem;
+}
+
+.operation-form-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: .75rem;
+  margin-top: 1rem;
+}
+
+.operation-form-footer p {
+  margin: 0;
+}
+
+.operation-field .select2-container .select2-selection--single {
+  height: auto;
+  min-height: calc(1.5em + .75rem + 2px);
+  border-color: #b8c7d6;
+  border-radius: .5rem;
+}
+
+.operation-field .select2-container .select2-selection--single .select2-selection__rendered {
+  padding: .375rem 2rem .375rem .75rem;
+  line-height: 1.5;
+}
+
+.operation-field .select2-container .select2-selection--single .select2-selection__arrow {
+  height: 100%;
+}
+
+.operation-field .select2-container--focus .select2-selection--single,
+.operation-field .select2-container--open .select2-selection--single {
+  border-color: var(--operation-blue);
+  outline: 2px solid #bfd6f7;
+  outline-offset: 1px;
+}
+
+@media (max-width: 960px) {
+  .operation-filters form {
+    grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr));
+  }
+
+  .operation-filter-actions {
+    grid-column: 1 / -1;
+    padding-top: 0;
+  }
+
+  .operation-record {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr);
+  }
+
+  .operation-record-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 700px) {
+  .operation-form-layout,
+  .operation-record {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .operation-record-facts {
+    grid-template-columns: repeat(auto-fit, minmax(5.3rem, 1fr));
+  }
+}
+
+@media (max-width: 490px) {
+  .operation-filters form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .operation-filter:first-child {
+    grid-column: 1 / -1;
+  }
+
+  .operation-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .operation-filter input[type="date"] {
+    min-width: 0;
+  }
+}

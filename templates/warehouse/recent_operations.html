@@ -1,0 +1,24 @@
+<section class="workspace-panel recent-panel">
+  <div class="recent-heading">
+    <h2>{{ title }}</h2>
+    <a href="{{ link }}">Все записи <span class="visually-hidden">из раздела «{{ title }}»</span></a>
+  </div>
+  {% if entries %}
+    <ul class="recent-list">
+      {% for entry in entries %}
+        <li>
+          <time datetime="{{ entry.date|date:'Y-m-d' }}">{{ entry.date|date:"d.m.y" }}</time>
+          <div class="recent-part">
+            <strong>{{ entry.spare }}</strong>
+            <span>{{ entry.warehouse }}</span>
+          </div>
+          <span class="recent-quantity quantity-{{ direction }}">
+            {% if direction == 'in' %}+{% else %}−{% endif %}{{ entry.quantity|floatformat:"-2" }}{% if entry.measure %} {{ entry.measure }}{% endif %}
+          </span>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="muted-copy p-4 m-0">Записей пока нет.</p>
+  {% endif %}
+</section>

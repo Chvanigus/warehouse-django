@@ -1,55 +1,164 @@
 {% extends 'spares/report_base.html' %}
+{% load static %}
 
-{% block title %}Отчёт по остаткам{% endblock %}
+{% block title %}Остатки запчастей{% endblock %}
+
+{% block extra_css %}
+  {{ block.super }}
+  <link rel="stylesheet" href="{% static 'css/stock-workspace.css' %}">
+{% endblock %}
 
 {% block content %}
-  <main class="container-fluid px-4 py-4">
-    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
-      <h1 class="h2 mb-0">Остатки</h1>
-      {% if perms.spares.add_stock %}<a class="btn btn-primary" href="{% url 'catalog:stock-add' %}">Добавить остаток</a>{% endif %}
-    </div>
-    <div class="card card-body">
-      <div class="table-responsive">
-        <table class="table table-striped report-datatable">
-          <thead>
-            <tr>
-              <th scope="col">Наименование</th>
-              <th scope="col">Остаток</th>
-              <th scope="col">Приход</th>
-              <th scope="col">Расход</th>
-              <th scope="col">Мера</th>
-              <th scope="col">Фирма</th>
-              <th scope="col">Склад</th>
-              <th scope="col">Цена</th>
-              <th scope="col">План</th>
-              <th scope="col">Расхождение</th>
-              <th scope="col">По инвентаризации</th>
-              {% if perms.spares.change_stock %}<th scope="col" class="no-export">Действия</th>{% endif %}
-            </tr>
-          </thead>
-          <tbody>
-            {% for stock in report_data %}
-              <tr>
-                <td>{{ stock.spare }}</td>
-                <td>{{ stock.actual_balance|floatformat:'2u' }}</td>
-                <td>{{ stock.input_quantity|floatformat:'2u' }}</td>
-                <td>{{ stock.output_quantity|floatformat:'2u' }}</td>
-                <td>{{ stock.measure|default_if_none:'—' }}</td>
-                <td>{{ stock.company }}</td>
-                <td>{{ stock.warehouse }}</td>
-                <td>{{ stock.price|floatformat:'2u' }}</td>
-                <td>{{ stock.plan|default:'—' }}</td>
-                <td>{% if stock.inventory is None %}—{% elif stock.discrepancy %}Да{% else %}Нет{% endif %}</td>
-                <td>{{ stock.inventory|default_if_none:'—' }}</td>
-                {% if perms.spares.change_stock %}
-                  <td><a class="btn btn-sm btn-outline-primary" href="{% url 'catalog:stock-edit' stock.pk %}">Изменить</a></td>
-                {% endif %}
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-        {% if not report_data %}<noscript><p>Остатков пока нет.</p></noscript>{% endif %}
+  <main class="workspace stock-workspace">
+    <div class="page-heading">
+      <div>
+        <p class="eyebrow">Запчасти на складах</p>
+        <h1>Остатки</h1>
+        <p class="muted-copy mb-0">Найдите запчасть, проверьте количество и результаты инвентаризации.</p>
+      </div>
+      <div class="d-flex flex-wrap gap-2">
+        {% if perms.spares.add_stock %}
+          <a class="btn btn-outline-secondary" href="{% url 'catalog:stock-add' %}">Начальный остаток</a>
+        {% endif %}
+        {% if perms.spares.add_receipt %}
+          <a class="btn btn-primary" href="{% url 'operations:receipt_add' %}">Оформить приход</a>
+        {% endif %}
       </div>
     </div>
+
+    <section class="workspace-panel p-3 p-lg-4 mb-4" aria-labelledby="stock-filters">
+      <h2 id="stock-filters" class="h6 mb-3">Фильтры остатков</h2>
+      <form method="get" action="{% url 'spares:stock_report' %}">
+        <div class="row g-3">
+          {% for field in form %}
+            {% if field.name != 'discrepancy' %}
+              <div class="{% if field.name == 'q' %}col-lg-6{% else %}col-sm-6 col-lg-3{% endif %}">
+                <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% if field.errors %}<div class="text-danger small mt-1" role="alert">{{ field.errors }}</div>{% endif %}
+              </div>
+            {% endif %}
+          {% endfor %}
+        </div>
+        <div class="d-flex flex-wrap gap-3 align-items-center justify-content-between mt-3">
+          <div class="form-check">
+            {{ form.discrepancy }}
+            <label class="form-check-label" for="{{ form.discrepancy.id_for_label }}">{{ form.discrepancy.label }}</label>
+          </div>
+          <div class="d-flex flex-wrap gap-2">
+            {% if form.has_changed %}
+              <a class="btn btn-outline-secondary" href="{% url 'spares:stock_report' %}">Сбросить</a>
+            {% endif %}
+            <button type="submit" class="btn btn-primary">Показать</button>
+          </div>
+        </div>
+      </form>
+    </section>
+
+    <section class="workspace-panel p-3 p-lg-4" aria-labelledby="stock-results">
+      <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+        <h2 id="stock-results" class="h5 me-2 mb-0">Позиции на складах</h2>
+        {% if not form.errors %}
+          <span class="badge rounded-pill text-bg-light">Найдено {{ counts.matches }}</span>
+          {% if counts.discrepancies %}
+            <span class="badge rounded-pill text-bg-warning">К сверке {{ counts.discrepancies }}</span>
+          {% endif %}
+          {% if counts.unavailable %}
+            <span class="badge rounded-pill text-bg-light">Нет в наличии {{ counts.unavailable }}</span>
+          {% endif %}
+        {% endif %}
+      </div>
+      {% if report_data %}
+        <div class="table-responsive">
+          <table class="table table-hover align-middle report-datatable stock-table" role="table"
+                 data-stock-workspace data-export-title="Остатки запчастей">
+            <thead>
+              <tr>
+                <th scope="col">Запчасть</th>
+                <th scope="col">Склад</th>
+                <th scope="col">Фирма</th>
+                <th scope="col" class="no-export stock-sortable">На остатке</th>
+                <th scope="col" class="no-export stock-sortable">Цена</th>
+                <th scope="col" class="no-export">Инвентаризация</th>
+                {% if perms.spares.change_stock or perms.spares.add_writeoff %}<th scope="col" class="no-export">Действия</th>{% endif %}
+                <th scope="col" data-export-only hidden>Остаток</th>
+                <th scope="col" data-export-only hidden>Ед. изм.</th>
+                <th scope="col" data-export-only hidden>Цена</th>
+                <th scope="col" data-export-only hidden>Приход</th>
+                <th scope="col" data-export-only hidden>Расход</th>
+                <th scope="col" data-export-only hidden>По инвентаризации</th>
+                <th scope="col" data-export-only hidden>Расхождение</th>
+                <th scope="col" data-export-only hidden>План</th>
+              </tr>
+            </thead>
+          <tbody role="rowgroup">
+              {% for stock in report_data %}
+                <tr role="row">
+                  <th scope="row" role="rowheader" class="fw-semibold">{{ stock.spare }}</th>
+                  <td role="cell" data-label="Склад">{{ stock.warehouse }}</td>
+                  <td role="cell" data-label="Фирма">{{ stock.company }}</td>
+                  <td role="cell" data-label="На остатке"
+                      class="stock-quantity{% if stock.actual_balance <= 0 %} text-secondary{% endif %}"
+                      data-order="{{ stock.actual_balance|floatformat:'-2u' }}">
+                    <strong>{{ stock.actual_balance|floatformat:'-2' }}</strong>{% if stock.measure %} <span class="small">{{ stock.measure }}</span>{% endif %}
+                    {% if stock.input_quantity or stock.output_quantity %}
+                      <span class="d-block small text-secondary">
+                        Приход {{ stock.input_quantity|floatformat:'-2' }} / расход {{ stock.output_quantity|floatformat:'-2' }}
+                      </span>
+                    {% endif %}
+                  </td>
+                  <td role="cell" data-label="Цена" class="stock-quantity"
+                      data-order="{{ stock.price|floatformat:'2u' }}">{{ stock.price|floatformat:'2' }}</td>
+                  <td role="cell" data-label="Инвентаризация">
+                    {% if stock.inventory is None %}
+                      <span class="text-secondary small">Нет данных</span>
+                    {% else %}
+                      <span class="badge {% if stock.discrepancy %}text-bg-warning{% else %}text-bg-success{% endif %}">
+                        {% if stock.discrepancy %}Расхождение{% else %}Совпадает{% endif %}
+                      </span>
+                      <span class="d-block small text-secondary">По факту {{ stock.inventory|floatformat:'-2' }}{% if stock.measure %} {{ stock.measure }}{% endif %}</span>
+                    {% endif %}
+                    {% if stock.plan %}<span class="d-block small text-secondary">План {{ stock.plan }}</span>{% endif %}
+                  </td>
+                  {% if perms.spares.change_stock or perms.spares.add_writeoff %}
+                    <td role="cell" class="stock-cell-actions">
+                      <div class="stock-row-actions">
+                        {% if perms.spares.add_writeoff and stock.actual_balance > 0 %}
+                          <a class="btn btn-sm btn-outline-primary" href="{% url 'operations:writeoff_add' %}?stock={{ stock.pk }}">Списать</a>
+                        {% endif %}
+                        {% if perms.spares.change_stock %}
+                          <a class="btn btn-sm btn-outline-secondary" href="{% url 'catalog:stock-edit' stock.pk %}">Сверить</a>
+                        {% endif %}
+                      </div>
+                    </td>
+                  {% endif %}
+                  <td hidden>{{ stock.actual_balance|floatformat:'-2u' }}</td>
+                  <td hidden>{{ stock.measure|default_if_none:'' }}</td>
+                  <td hidden>{{ stock.price|floatformat:'2u' }}</td>
+                  <td hidden>{{ stock.input_quantity|floatformat:'-2u' }}</td>
+                  <td hidden>{{ stock.output_quantity|floatformat:'-2u' }}</td>
+                  <td hidden>{% if stock.inventory is not None %}{{ stock.inventory|floatformat:'-2u' }}{% endif %}</td>
+                  <td hidden>{% if stock.inventory is not None %}{{ stock.discrepancy|yesno:"Да,Нет" }}{% endif %}</td>
+                  <td hidden>{{ stock.plan }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="stock-empty">
+          {% if form.errors %}
+            <h3 class="h6">Проверьте фильтры</h3>
+            <p class="muted-copy mb-0">Исправьте отмеченные поля и примените фильтры ещё раз.</p>
+          {% elif form.has_changed %}
+            <h3 class="h6">Подходящих позиций нет</h3>
+            <p class="muted-copy mb-0">Попробуйте другое название запчасти или сбросьте фильтры.</p>
+          {% else %}
+            <h3 class="h6">Остатков пока нет</h3>
+            <p class="muted-copy mb-0">Позиции появятся после оформления прихода или ввода начального остатка.</p>
+          {% endif %}
+        </div>
+      {% endif %}
+    </section>
   </main>
 {% endblock %}

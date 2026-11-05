@@ -1,4 +1,5 @@
 from django import forms
+from django.forms.models import ModelChoiceIteratorValue
 
 from .models import MachineWorker, Receipt, Stock, WriteOff
 
@@ -89,3 +90,71 @@ class WriteOffForm(forms.ModelForm):
         model = WriteOff
         fields = ('spares_list', 'machine_list', 'date', 'quantity')
         widgets = {'date': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date'})}
+
+
+class OperationReceiptForm(ReceiptForm):
+    class Meta(ReceiptForm.Meta):
+        labels = {'spare': 'Запчасть', 'measure': 'Единица измерения', 'price': 'Цена за единицу'}
+
+
+class StockChoiceSelect(forms.Select):
+    """Keep machine-readable quantities separate from the localised option label."""
+
+    original_stock_id = None
+    original_quantity = 0
+
+    def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
+        option = super().create_option(name, value, label, selected, index, subindex, attrs)
+        if isinstance(value, ModelChoiceIteratorValue):
+            stock = value.instance
+            available = stock.actual_balance
+            if stock.pk == self.original_stock_id:
+                available += self.original_quantity
+            option['attrs'].update({
+                'data-balance': format(stock.actual_balance, 'f'),
+                'data-available': format(available, 'f'),
+                'data-price': format(stock.price, 'f'),
+                'data-measure': str(stock.measure) if stock.measure else '',
+            })
+        return option
+
+
+class OperationWriteOffForm(WriteOffForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        field = self.fields['spares_list']
+        widget = StockChoiceSelect()
+        widget.choices = field.choices
+        field.widget = widget
+        stock = self.initial.get('spares_list')
+        if stock is not None and not self.instance._state.adding:
+            widget.original_stock_id = stock.pk
+            widget.original_quantity = self.instance.quantity
+
+
+class JournalFilterForm(forms.Form):
+    q = forms.CharField(
+        label='Поиск',
+        required=False,
+        max_length=100,
+        widget=forms.TextInput(attrs={'type': 'search', 'class': 'form-control'}),
+    )
+    date_from = forms.DateField(
+        label='Дата с',
+        required=False,
+        input_formats=['%Y-%m-%d'],
+        widget=forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date', 'class': 'form-control'}),
+    )
+    date_to = forms.DateField(
+        label='Дата по',
+        required=False,
+        input_formats=['%Y-%m-%d'],
+        widget=forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date', 'class': 'form-control'}),
+    )
+
+    def clean(self):
+        data = super().clean()
+        start, end = data.get('date_from'), data.get('date_to')
+        if start and end and start > end:
+            self.add_error('date_to', 'Конец периода должен быть не раньше начала.')
+        return data

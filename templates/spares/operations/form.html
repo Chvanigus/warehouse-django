@@ -1,47 +1,119 @@
 {% extends 'base.html' %}
-{% load static user_filters %}
+{% load static %}
 
-{% block title %}{{ object_label }} · {{ list_title }}{% endblock %}
+{% block title %}{% if object %}Изменение{% else %}Оформление{% endif %} · {{ list_title }}{% endblock %}
 
 {% block extra_css %}
-  {% if form.spares_list %}
-    <link rel="stylesheet" href="{% static 'libs/select2/css/select2.min.css' %}">
-  {% endif %}
+  <link rel="stylesheet" href="{% static 'libs/select2/css/select2.min.css' %}">
+  <link rel="stylesheet" href="{% static 'css/operations.css' %}">
 {% endblock %}
 
 {% block content %}
-  <main class="container py-4">
-    <p><a href="{{ list_url }}">К списку</a></p>
-    <h1>{% if object %}Изменение записи{% else %}Новая запись{% endif %}</h1>
-    <p class="lead">{{ object_label }}</p>
-    <form method="post" class="col-12 col-lg-7 p-0">
+  <main class="workspace operation-workspace">
+    <div class="page-heading operation-heading">
+      <div>
+        <p class="eyebrow">{{ list_title }}{% if object %} · Запись № {{ object.pk }}{% endif %}</p>
+        {% if operation_name == 'receipt' %}
+          <h1>{% if object %}Изменить приход{% else %}Оформить приход{% endif %}</h1>
+          <p class="muted-copy">Укажите поставку, место хранения и количество запчастей.</p>
+        {% else %}
+          <h1>{% if object %}Изменить списание{% else %}Оформить списание{% endif %}</h1>
+          <p class="muted-copy">Выберите остаток и укажите, кому выдали запчасть.</p>
+        {% endif %}
+      </div>
+      <a href="{{ list_url }}" class="btn btn-outline-secondary">К журналу</a>
+    </div>
+
+    <form method="post" data-operation-form="{{ operation_name }}">
       {% csrf_token %}
       {% if form.non_field_errors %}
         <div class="alert alert-danger" role="alert">{{ form.non_field_errors }}</div>
       {% endif %}
-      {% for field in form %}
-        <div class="mb-3">
-          {{ field.label_tag }}
-          {% if field.name == 'spares_list' or field.name == 'machine_list' %}
-            {{ field|addclass:"form-select warehouse-choice" }}
+      <div class="operation-form-layout">
+        <div class="operation-form-main">
+          {% if operation_name == 'receipt' %}
+            <section class="workspace-panel operation-form-panel">
+              <h2>Запчасть и склад</h2>
+              <div class="operation-fields">
+                {% include 'spares/operations/field.html' with field=form.spare %}
+                {% include 'spares/operations/field.html' with field=form.measure %}
+                {% include 'spares/operations/field.html' with field=form.warehouse %}
+                {% include 'spares/operations/field.html' with field=form.company %}
+              </div>
+            </section>
+            <section class="workspace-panel operation-form-panel">
+              <h2>Накладная</h2>
+              <div class="operation-fields">
+                {% include 'spares/operations/field.html' with field=form.date %}
+                {% include 'spares/operations/field.html' with field=form.invoice_number %}
+                {% include 'spares/operations/field.html' with field=form.contractor wide=True %}
+              </div>
+            </section>
           {% else %}
-            {{ field|addclass:"form-control" }}
+            <section class="workspace-panel operation-form-panel">
+              <h2>Что списываем</h2>
+              <div class="operation-fields">
+                {% include 'spares/operations/field.html' with field=form.spares_list wide=True %}
+                {% include 'spares/operations/field.html' with field=form.quantity %}
+                {% include 'spares/operations/field.html' with field=form.date %}
+              </div>
+            </section>
+            <section class="workspace-panel operation-form-panel">
+              <h2>Кому выдаём</h2>
+              <div class="operation-fields">
+                {% include 'spares/operations/field.html' with field=form.machine_list wide=True %}
+              </div>
+            </section>
           {% endif %}
-          {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
-          {% if field.errors %}<div class="text-danger" role="alert">{{ field.errors }}</div>{% endif %}
+          {% if operation_name == 'receipt' %}
+            <section class="workspace-panel operation-form-panel">
+              <h2>Количество и цена</h2>
+              <div class="operation-fields">
+                {% include 'spares/operations/field.html' with field=form.quantity %}
+                {% include 'spares/operations/field.html' with field=form.price %}
+              </div>
+            </section>
+          {% endif %}
         </div>
-      {% endfor %}
-      <button type="submit" class="btn btn-primary">Сохранить</button>
-      <a href="{{ list_url }}" class="btn btn-outline-secondary">Отмена</a>
+        <aside class="workspace-panel operation-summary" aria-labelledby="operation-summary-title">
+          <h2 id="operation-summary-title">Итог операции</h2>
+          <dl>
+            {% if operation_name == 'writeoff' %}
+              <div><dt>Сейчас на складе</dt><dd data-preview-balance>—</dd></div>
+              <div data-preview-edit hidden><dt>Доступно с учётом этой записи</dt><dd data-preview-available>—</dd></div>
+            {% endif %}
+            <div><dt>Количество</dt><dd data-preview-quantity>—</dd></div>
+            <div><dt>Цена за единицу</dt><dd data-preview-price>—</dd></div>
+            <div class="operation-summary-total"><dt>Сумма</dt><dd><output data-preview-total>—</output></dd></div>
+          </dl>
+          <p class="operation-balance-warning" data-preview-warning role="status" hidden>
+            Количество больше доступного остатка.
+          </p>
+          {% if operation_name == 'writeoff' %}
+            <p class="muted-copy">При сохранении остаток проверяется ещё раз.</p>
+          {% else %}
+            <p class="muted-copy">Сумма рассчитывается из количества и цены за единицу.</p>
+          {% endif %}
+        </aside>
+      </div>
+
+      <div class="operation-form-footer">
+        <p class="muted-copy"><span class="operation-required" aria-hidden="true">*</span> Обязательные поля</p>
+        <div class="operation-form-actions">
+          <button type="submit" class="btn btn-primary">
+            {% if object %}Сохранить изменения{% elif operation_name == 'receipt' %}Сохранить приход{% else %}Сохранить списание{% endif %}
+          </button>
+          <a href="{{ list_url }}" class="btn btn-outline-secondary">Отмена</a>
+        </div>
+      </div>
     </form>
   </main>
 {% endblock %}
 
 {% block extra_javascript %}
-  {% if form.spares_list %}
-    <script src="{% static 'libs/jquery/jquery.min.js' %}"></script>
-    <script src="{% static 'libs/select2/js/select2.min.js' %}"></script>
-    <script src="{% static 'libs/select2/js/i18n/ru.js' %}"></script>
-    <script src="{% static 'js/pages/warehouse-choice.js' %}"></script>
-  {% endif %}
+  <script src="{% static 'libs/jquery/jquery.min.js' %}"></script>
+  <script src="{% static 'libs/select2/js/select2.min.js' %}"></script>
+  <script src="{% static 'libs/select2/js/i18n/ru.js' %}"></script>
+  <script src="{% static 'js/pages/warehouse-choice.js' %}"></script>
+  <script src="{% static 'js/pages/operation-preview.js' %}"></script>
 {% endblock %}

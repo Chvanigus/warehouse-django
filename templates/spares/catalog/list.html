@@ -1,22 +1,26 @@
 {% extends 'base.html' %}
 {% block title %}{{ catalog_name|capfirst }}{% endblock %}
 {% block content %}
-  <main class="container py-4">
-    <p><a href="{% url 'catalog:index' %}">Все справочники</a></p>
-    <h1>{{ catalog_name|capfirst }}</h1>
-    <div class="d-flex flex-wrap gap-2 justify-content-between my-3">
+  <main class="workspace">
+    <div class="page-heading">
+      <div>
+        <p class="eyebrow mb-2"><a href="{% url 'catalog:index' %}">Все справочники</a></p>
+        <h1>{{ catalog_name|capfirst }}</h1>
+      </div>
+      {% if can_add %}
+        <a href="{% url 'catalog:add' slug %}" class="btn btn-primary">Добавить</a>
+      {% endif %}
+    </div>
+    <div class="d-flex flex-wrap gap-2 justify-content-between mb-3">
       <form method="get" class="d-flex gap-2" role="search">
         <input type="search" class="form-control" name="q" value="{{ query }}" aria-label="Поиск" placeholder="Поиск">
         <button type="submit" class="btn btn-outline-primary">Найти</button>
         {% if query %}<a class="btn btn-outline-secondary" href="{{ back_url }}">Сбросить</a>{% endif %}
       </form>
-      {% if can_add %}
-        <a href="{% url 'catalog:add' slug %}" class="btn btn-primary">Добавить</a>
-      {% endif %}
     </div>
     {% if rows %}
-      <div class="table-responsive">
-        <table class="table table-striped align-middle">
+      <div class="workspace-panel table-responsive">
+        <table class="table table-hover align-middle mb-0">
           <thead><tr>
             {% for column in columns %}<th scope="col">{{ column|capfirst }}</th>{% endfor %}
             {% if can_change or can_delete %}<th scope="col">Действия</th>{% endif %}
@@ -41,10 +45,10 @@
         </table>
       </div>
     {% else %}
-      <p class="text-muted">Записей нет.</p>
+      <p class="workspace-panel muted-copy p-4">{% if query %}По этому запросу ничего не найдено.{% else %}Записей пока нет.{% endif %}</p>
     {% endif %}
     {% if is_paginated %}
-      <nav class="d-flex gap-3 align-items-center" aria-label="Страницы справочника">
+      <nav class="d-flex gap-3 align-items-center mt-3" aria-label="Страницы справочника">
         {% if page_obj.has_previous %}
           <a href="{% querystring page=page_obj.previous_page_number %}">Назад</a>
         {% endif %}

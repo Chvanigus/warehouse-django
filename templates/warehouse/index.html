@@ -1,50 +1,83 @@
 {% extends 'base.html' %}
 
+{% block title %}Обзор склада{% endblock %}
+
 {% block content %}
-  <main class="container py-4">
-    <h1 class="h2 mb-4">Складской учёт</h1>
-    <div class="row row-cols-1 row-cols-lg-3 g-3">
-      {% if perms.spares.view_receipt or perms.spares.view_writeoff or perms.spares.view_movement %}
-        <section class="col">
-          <div class="card h-100">
-            <div class="card-body">
-              <h2 class="h5">Операции</h2>
-              <div class="list-group list-group-flush">
-                {% if perms.spares.view_receipt %}<a class="list-group-item list-group-item-action" href="{% url 'operations:receipts' %}">Приход</a>{% endif %}
-                {% if perms.spares.view_writeoff %}<a class="list-group-item list-group-item-action" href="{% url 'operations:writeoffs' %}">Списания</a>{% endif %}
-                {% if perms.spares.view_movement %}<a class="list-group-item list-group-item-action" href="{% url 'operations:movements' %}">Перемещения</a>{% endif %}
-              </div>
+  <main class="workspace dashboard">
+    <section class="dashboard-welcome" aria-labelledby="dashboard-title">
+      <div>
+        <p class="eyebrow mb-2">Складской учёт</p>
+        <h1 id="dashboard-title">Склад запчастей</h1>
+        <p class="dashboard-intro">Остатки по складам, поступления и списания в одном месте.</p>
+        {% if perms.spares.add_receipt or perms.spares.add_writeoff %}
+          <div class="dashboard-actions">
+            {% if perms.spares.add_receipt %}
+              <a class="btn btn-primary" href="{% url 'operations:receipt_add' %}">
+                {% include 'include/icon.html' with name='in' only %} Оформить приход
+              </a>
+            {% endif %}
+            {% if perms.spares.add_writeoff %}
+              <a class="btn btn-outline-primary" href="{% url 'operations:writeoff_add' %}">
+                {% include 'include/icon.html' with name='out' only %} Списать запчасти
+              </a>
+            {% endif %}
+          </div>
+        {% endif %}
+      </div>
+      <span class="dashboard-date">{% include 'include/icon.html' with name='calendar' only %} {{ today|date:"j E Y" }}</span>
+    </section>
+
+    {% if perms.spares.view_stock or perms.spares.view_receipt or perms.spares.view_writeoff %}
+      <div class="dashboard-stats">
+        {% if perms.spares.view_stock %}
+          <section class="workspace-panel dashboard-stat">
+            <span class="stat-icon stat-stock">{% include 'include/icon.html' with name='box' only %}</span>
+            <div>
+              <h2>Позиций в наличии</h2>
+              <p class="stat-value">{{ stock_summary.positions }}</p>
+              <a href="{% url 'spares:stock_report' %}">Все остатки {% include 'include/icon.html' with name='arrow' only %}</a>
             </div>
-          </div>
-        </section>
-      {% endif %}
-      {% if perms.spares.view_stock or perms.spares.view_receipt or perms.spares.view_writeoff %}
-        <section class="col">
-          <div class="card h-100">
-            <div class="card-body">
-              <h2 class="h5">Отчёты</h2>
-              <div class="list-group list-group-flush">
-                {% if perms.spares.view_stock %}<a class="list-group-item list-group-item-action" href="{% url 'spares:stock_report' %}">Остатки</a>{% endif %}
-                {% if perms.spares.view_receipt and perms.spares.view_writeoff %}<a class="list-group-item list-group-item-action" href="{% url 'spares:income_outcome_report' %}">Приход и расход</a>{% endif %}
-                {% if perms.spares.view_writeoff %}
-                  <a class="list-group-item list-group-item-action" href="{% url 'spares:machine_report' %}">По технике</a>
-                  <a class="list-group-item list-group-item-action" href="{% url 'spares:trailer_report' %}">По прицепам</a>
-                {% endif %}
-                {% if perms.spares.view_receipt %}<a class="list-group-item list-group-item-action" href="{% url 'spares:contractor_report' %}">По контрагентам</a>{% endif %}
-              </div>
+            {% if stock_summary.discrepancies %}
+              <a class="stat-discrepancy" href="{% url 'spares:stock_report' %}?discrepancy=1">Расхождений {{ stock_summary.discrepancies }}</a>
+            {% endif %}
+          </section>
+        {% endif %}
+        {% if perms.spares.view_receipt %}
+          <section class="workspace-panel dashboard-stat">
+            <span class="stat-icon stat-in">{% include 'include/icon.html' with name='in' only %}</span>
+            <div>
+              <h2>Приходов в этом месяце</h2>
+              <p class="stat-value">{{ receipt_count }}</p>
+              <a href="{% url 'operations:receipts' %}">Журнал прихода {% include 'include/icon.html' with name='arrow' only %}</a>
             </div>
-          </div>
-        </section>
+          </section>
+        {% endif %}
+        {% if perms.spares.view_writeoff %}
+          <section class="workspace-panel dashboard-stat">
+            <span class="stat-icon stat-out">{% include 'include/icon.html' with name='out' only %}</span>
+            <div>
+              <h2>Списаний в этом месяце</h2>
+              <p class="stat-value">{{ writeoff_count }}</p>
+              <a href="{% url 'operations:writeoffs' %}">Журнал расхода {% include 'include/icon.html' with name='arrow' only %}</a>
+            </div>
+          </section>
+        {% endif %}
+      </div>
+    {% else %}
+      {% if not perms.spares.add_receipt and not perms.spares.add_writeoff %}
+        <p class="workspace-panel p-4">Остатки и журналы появятся здесь, когда вашей учётной записи выдадут права на просмотр.</p>
       {% endif %}
-      <section class="col">
-        <div class="card h-100">
-          <div class="card-body">
-            <h2 class="h5">Справочники</h2>
-            <p>Запчасти, склады, фирмы, сотрудники и техника.</p>
-            <a class="btn btn-outline-primary" href="{% url 'catalog:index' %}">Открыть справочники</a>
-          </div>
-        </div>
-      </section>
+    {% endif %}
+
+    <div class="dashboard-recent">
+      {% if perms.spares.view_receipt %}
+        {% url 'operations:receipts' as receipts_url %}
+        {% include 'warehouse/recent_operations.html' with title='Последние поступления' entries=recent_receipts link=receipts_url direction='in' only %}
+      {% endif %}
+      {% if perms.spares.view_writeoff %}
+        {% url 'operations:writeoffs' as writeoffs_url %}
+        {% include 'warehouse/recent_operations.html' with title='Последние списания' entries=recent_writeoffs link=writeoffs_url direction='out' only %}
+      {% endif %}
     </div>
   </main>
 {% endblock %}

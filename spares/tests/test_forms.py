@@ -51,10 +51,20 @@ class WarehouseOperationTests(TestCase):
         add_receipt = reverse('operations:receipt_add')
         self.assertEqual(self.client.get(receipt_list).status_code, 302)
         self.client.force_login(self.observer)
-        self.assertNotContains(self.client.get(receipt_list), 'Добавить запись')
+        self.assertNotContains(self.client.get(receipt_list), add_receipt)
         self.assertEqual(self.client.post(add_receipt, self.receipt_data).status_code, 403)
         self.assertEqual(self.client.get(reverse('operations:movements')).status_code, 403)
         self.assertFalse(Receipt.objects.exists())
+
+    def test_journal_combines_text_search_and_dates(self):
+        self.client.force_login(self.operator)
+        self.add_receipt()
+        url = reverse('operations:receipts')
+        self.assertContains(self.client.get(url, {'q': 'фильтр', 'date_from': '2026-01-10'}), 'НК-100')
+        self.assertNotContains(self.client.get(url, {'q': 'фильтр', 'date_to': '2026-01-09'}), 'НК-100')
+        response = self.client.get(url, {'date_from': '2026-02-01', 'date_to': '2026-01-01'})
+        self.assertContains(response, 'Конец периода должен быть не раньше начала')
+        self.assertNotContains(response, 'НК-100')
 
     def test_operator_can_create_move_and_delete_receipt(self):
         self.client.force_login(self.operator)
@@ -119,6 +129,29 @@ class WarehouseOperationTests(TestCase):
         )
         stock.refresh_from_db()
         self.assertEqual(stock.actual_balance, Decimal('8'))
+
+    def test_writeoff_from_stock_prefills_and_previews_available_quantity(self):
+        self.client.force_login(self.operator)
+        self.add_receipt()
+        stock = Stock.objects.get()
+        url = reverse('operations:writeoff_add')
+        response = self.client.get(url, {'stock': stock.pk})
+        self.assertEqual(response.context['form']['spares_list'].value(), stock.pk)
+        self.assertContains(response, 'data-balance="8.00"')
+        self.assertContains(response, 'data-price="7.50"')
+        self.assertIsNone(self.client.get(url, {'stock': 'invalid'}).context['form']['spares_list'].value())
+
+        self.client.post(url, {
+            'spares_list': stock.pk,
+            'machine_list': self.assignment.pk,
+            'date': '2026-01-10',
+            'quantity': '8',
+        })
+        self.assertIsNone(self.client.get(url, {'stock': stock.pk}).context['form']['spares_list'].value())
+        edit_url = reverse('operations:writeoff_edit', args=[WriteOff.objects.get().pk])
+        response = self.client.get(edit_url)
+        self.assertContains(response, 'data-balance="0.00"')
+        self.assertContains(response, 'data-available="8.00"')
 
     def test_stock_form_keeps_existing_identity(self):
         self.client.force_login(self.operator)

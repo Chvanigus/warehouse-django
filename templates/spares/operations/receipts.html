@@ -1,25 +1,32 @@
 {% extends 'spares/operations/list.html' %}
 
-{% block headings %}
-  <th scope="col">Дата</th>
-  <th scope="col">Запчасть</th>
-  <th scope="col">Склад / фирма</th>
-  <th scope="col">Количество</th>
-  <th scope="col">Цена</th>
-  <th scope="col">Сумма</th>
-  <th scope="col">Накладная</th>
-  <th scope="col">Контрагент</th>
-  {% if can_change or can_delete %}<th scope="col">Действия</th>{% endif %}
-{% endblock %}
+{% block description %}Поставки запчастей по накладным и складам.{% endblock %}
+{% block empty_copy %}Оформленные поставки будут видны в этом журнале.{% endblock %}
 
-{% block cells %}
-  <td>{{ entry.date|date:"d.m.Y" }}</td>
-  <td>{{ entry.spare }}</td>
-  <td>{{ entry.warehouse }} / {{ entry.company }}</td>
-  <td>{{ entry.quantity }} {{ entry.measure|default_if_none:"" }}</td>
-  <td>{{ entry.price }}</td>
-  <td>{{ entry.amount }}</td>
-  <td>{{ entry.invoice_number }}</td>
-  <td>{{ entry.contractor }}</td>
+{% block record %}
+  <div class="operation-record-main">
+    <p class="operation-record-date">
+      <time datetime="{{ entry.date|date:'Y-m-d' }}">{{ entry.date|date:'d.m.Y' }}</time>
+      <span>· № {{ entry.invoice_number }}</span>
+    </p>
+    <h3>{{ entry.spare }}</h3>
+    <p class="muted-copy">{{ entry.contractor }}</p>
+  </div>
+  <dl class="operation-record-facts">
+    <div>
+      <dt>Склад</dt>
+      <dd>{{ entry.warehouse }}</dd>
+      <dd class="muted-copy">{{ entry.company }}</dd>
+    </div>
+    <div>
+      <dt>Количество</dt>
+      <dd class="operation-quantity operation-quantity-in">+{{ entry.quantity|floatformat:'-2' }} {{ entry.measure|default_if_none:'' }}</dd>
+      <dd class="muted-copy">Цена {{ entry.price|floatformat:'2' }}</dd>
+    </div>
+    <div>
+      <dt>Сумма</dt>
+      <dd class="operation-total">{{ entry.amount|floatformat:'2' }}</dd>
+    </div>
+  </dl>
   {% include 'spares/operations/actions.html' %}
 {% endblock %}
