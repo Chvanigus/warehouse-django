@@ -1,0 +1,23 @@
+<div class="table-responsive">
+  <table class="table align-middle mb-0">
+    <thead>
+      <tr><th scope="col">Запчасть</th><th scope="col">Единица</th>
+        <th scope="col" class="text-end">Количество</th><th scope="col" class="text-end">Цена</th>
+        <th scope="col" class="text-end">Сумма</th></tr>
+    </thead>
+    <tbody>
+      {% for line in lines %}
+        <tr>
+          <th scope="row" class="fw-semibold">{{ line.spare }}</th>
+          <td>{{ line.measure|default_if_none:"—" }}</td>
+          <td class="text-end">{{ line.quantity|floatformat:"-2" }}</td>
+          <td class="text-end">{{ line.price|floatformat:"2" }}</td>
+          <td class="text-end">{{ line.amount|floatformat:"2" }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr><th colspan="4" scope="row">Итого</th><td class="text-end fw-bold">{{ total|floatformat:"2" }}</td></tr>
+    </tfoot>
+  </table>
+</div>

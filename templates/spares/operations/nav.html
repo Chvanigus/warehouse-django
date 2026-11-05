@@ -1,11 +1,14 @@
 <nav class="operation-nav" aria-label="Складские операции">
   {% if perms.spares.view_receipt %}
     <a href="{% url 'operations:receipts' %}"{% if operation_name == 'receipt' %} aria-current="page"{% endif %}>Приход</a>
+    <a href="{% url 'invoices:list' %}">Накладные</a>
   {% endif %}
   {% if perms.spares.view_writeoff %}
     <a href="{% url 'operations:writeoffs' %}"{% if operation_name == 'writeoff' %} aria-current="page"{% endif %}>Расход</a>
   {% endif %}
-  {% if perms.spares.view_movement %}
+  {% if perms.spares.view_stocktransfer %}
+    <a href="{% url 'transfers:list' %}">Перемещения</a>
+  {% elif perms.spares.view_movement %}
     <a href="{% url 'operations:movements' %}"{% if operation_name == 'movement' %} aria-current="page"{% endif %}>Перемещения</a>
   {% endif %}
 </nav>

@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+{% load user_filters %}
+{% block title %}Пересчёт остатка{% endblock %}
+
+{% block content %}
+  <main class="workspace">
+    <div class="page-heading">
+      <div>
+        <p class="eyebrow mb-2">Инвентаризация</p>
+        <h1>Пересчёт остатка</h1>
+      </div>
+      {% if perms.spares.view_inventorycount %}
+        <a class="btn btn-outline-secondary" href="{% url 'inventory:list' %}?stock={{ stock.pk }}">История позиции</a>
+      {% endif %}
+    </div>
+    <form method="post" class="workspace-panel col-12 col-lg-7 p-3 p-md-4">
+      {% csrf_token %}
+      <h2 class="h5">{{ stock.spare }}</h2>
+      <p class="muted-copy">{{ stock.warehouse }} · {{ stock.company }} · Цена {{ stock.price|floatformat:'2' }}</p>
+      <p>По учёту сейчас <strong>{{ stock.actual_balance|floatformat:'-2' }} {{ stock.measure|default_if_none:'' }}</strong></p>
+      <p class="muted-copy">Запись сохранит учётное и фактическое количество на момент пересчёта. Чтобы изменить учётный остаток, оформите отдельную корректировку с причиной.</p>
+      {{ form.revision }}
+      {% if form.revision.errors or form.non_field_errors %}
+        <div class="alert alert-warning" role="alert">
+          {{ form.revision.errors }}
+          {{ form.non_field_errors }}
+          {% if form.revision.errors %}<a href="{% url 'inventory:add' stock.pk %}">Загрузить актуальный остаток</a>{% endif %}
+        </div>
+      {% endif %}
+      {% for field in form.visible_fields %}
+        <div class="mb-3">
+          {{ field.label_tag }}
+          {{ field|addclass:'form-control' }}
+          {% if field.errors %}<div class="text-danger" role="alert">{{ field.errors }}</div>{% endif %}
+        </div>
+      {% endfor %}
+      <button class="btn btn-primary" type="submit"{% if form.revision.errors %} disabled{% endif %}>Записать пересчёт</button>
+      {% if perms.spares.view_stock %}
+        <a class="btn btn-outline-secondary" href="{% url 'spares:stock_report' %}">К остаткам</a>
+      {% endif %}
+    </form>
+  </main>
+{% endblock %}

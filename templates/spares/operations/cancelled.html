@@ -1,0 +1,9 @@
+{% if entry.cancelled_at %}
+  <p class="small mb-0 mt-2">
+    <span class="badge text-bg-secondary">Отменён</span>
+    {{ entry.cancelled_at|date:'d.m.Y H:i' }} · {{ entry.cancelled_by_name }}<br>
+    {{ entry.cancellation_reason|linebreaksbr }}
+  </p>
+{% elif entry.date > today %}
+  <p class="small mb-0 mt-2"><span class="badge text-bg-warning">Будущая дата · проведён ранее</span></p>
+{% endif %}

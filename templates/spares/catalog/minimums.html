@@ -1,0 +1,103 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Минимальные остатки{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/stock-workspace.css' %}">{% endblock %}
+
+{% block content %}
+  <main class="workspace stock-workspace">
+    <div class="page-heading">
+      <div>
+        <p class="eyebrow mb-2">Пополнение запасов</p>
+        <h1>Минимальные остатки</h1>
+        <p class="muted-copy mb-0 mt-2">Остатки суммируются по всем ценовым партиям одной запчасти, фирмы, склада и единицы измерения.</p>
+      </div>
+      {% if can_add %}
+        <a class="btn btn-primary" href="{% url 'catalog:add' slug %}">Задать минимум</a>
+      {% endif %}
+    </div>
+
+    <section class="workspace-panel p-3 p-lg-4 mb-4" aria-labelledby="minimum-filters">
+      <h2 id="minimum-filters" class="h6 mb-3">Фильтры</h2>
+      <form method="get" action="{% url 'catalog:minimums' %}">
+        {% include 'spares/stock_filter_fields.html' with form=filters %}
+        <div class="d-flex flex-wrap gap-3 align-items-center justify-content-between mt-3">
+          <div class="form-check">
+            {{ filters.low }}
+            <label class="form-check-label" for="{{ filters.low.id_for_label }}">{{ filters.low.label }}</label>
+          </div>
+          <div class="d-flex flex-wrap gap-2">
+            {% if filters.has_changed %}
+              <a class="btn btn-outline-secondary" href="{% url 'catalog:minimums' %}">Сбросить</a>
+            {% endif %}
+            <button type="submit" class="btn btn-primary">Показать</button>
+          </div>
+        </div>
+      </form>
+    </section>
+
+    {% if rules %}
+      <div class="workspace-panel table-responsive p-3">
+        <table class="table table-hover align-middle mb-0 stock-table" role="table">
+          <thead>
+            <tr>
+              <th scope="col">Запчасть</th>
+              <th scope="col">Склад и фирма</th>
+              <th scope="col">Единица измерения</th>
+              <th scope="col">На остатке</th>
+              <th scope="col">Минимум</th>
+              <th scope="col">Статус</th>
+              {% if can_change or can_delete %}<th scope="col">Действия</th>{% endif %}
+            </tr>
+          </thead>
+          <tbody role="rowgroup">
+            {% for rule in rules %}
+              <tr role="row">
+                <th scope="row" role="rowheader">
+                  {{ rule.spare.name }}
+                  {% if rule.spare.sku %}<span class="d-block small text-secondary">{{ rule.spare.sku }}</span>{% endif %}
+                </th>
+                <td role="cell" data-label="Склад и фирма">{{ rule.warehouse }}<span class="d-block small text-secondary">{{ rule.company }}</span></td>
+                <td role="cell" data-label="Единица измерения">{{ rule.measure|default_if_none:"—" }}</td>
+                <td role="cell" data-label="На остатке" class="stock-quantity"><strong>{{ rule.available|floatformat:'-2' }}</strong></td>
+                <td role="cell" data-label="Минимум" class="stock-quantity">{{ rule.minimum|floatformat:'-2' }}</td>
+                <td role="cell" data-label="Статус">
+                  {% if rule.available < rule.minimum %}
+                    <span class="badge text-bg-warning">К пополнению</span>
+                  {% else %}
+                    <span class="badge text-bg-success">Достаточно</span>
+                  {% endif %}
+                </td>
+                {% if can_change or can_delete %}
+                  <td role="cell" class="stock-cell-actions">
+                    <div class="stock-row-actions">
+                      {% if can_change %}<a class="btn btn-sm btn-outline-primary" href="{% url 'catalog:edit' slug rule.pk %}">Изменить</a>{% endif %}
+                      {% if can_delete %}<a class="btn btn-sm btn-outline-danger" href="{% url 'catalog:delete' slug rule.pk %}">Удалить</a>{% endif %}
+                    </div>
+                  </td>
+                {% endif %}
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% elif filters.errors %}
+      <p class="workspace-panel muted-copy p-4">Исправьте отмеченные поля и примените фильтры ещё раз.</p>
+    {% elif filters.has_changed %}
+      <p class="workspace-panel muted-copy p-4">Подходящих позиций нет.</p>
+    {% else %}
+      <p class="workspace-panel muted-copy p-4">Минимальные остатки ещё не заданы.</p>
+    {% endif %}
+
+    {% if is_paginated %}
+      <nav class="d-flex gap-3 align-items-center mt-3" aria-label="Страницы минимальных остатков">
+        {% if page_obj.has_previous %}
+          <a href="{% querystring page=page_obj.previous_page_number %}">Назад</a>
+        {% endif %}
+        <span>Страница {{ page_obj.number }} из {{ paginator.num_pages }}</span>
+        {% if page_obj.has_next %}
+          <a href="{% querystring page=page_obj.next_page_number %}">Вперёд</a>
+        {% endif %}
+      </nav>
+    {% endif %}
+  </main>
+{% endblock %}

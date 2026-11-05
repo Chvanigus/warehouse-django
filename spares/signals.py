@@ -9,5 +9,5 @@ from spares.models import Receipt, Stock, WriteOff
 def reverse_stock_operation(sender, instance, using, **kwargs):
     # A loaded instance may be stale if another user has edited the operation.
     operation = instance._stored(using, lock=True)
-    if operation is not None:
+    if operation is not None and operation.cancelled_at is None:
         Stock.adjust(operation, -operation.quantity, using, persist=True, missing_ok=True)

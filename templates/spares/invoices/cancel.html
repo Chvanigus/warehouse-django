@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Отмена накладной № {{ invoice.number }}{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/operations.css' %}">{% endblock %}
+
+{% block content %}
+  <main class="workspace operation-workspace">
+    <div class="page-heading operation-heading">
+      <div>
+        <p class="eyebrow">Приход</p>
+        <h1>Отмена накладной № {{ invoice.number }}</h1>
+        <p class="muted-copy">{{ invoice.date|date:"d.m.Y" }} · {{ invoice.contractor }} · {{ invoice.warehouse }}</p>
+      </div>
+    </div>
+    <section class="workspace-panel operation-form-panel col-12 col-lg-7">
+      {% if invoice.cancelled_at %}
+        <p>Накладная уже отменена.</p>
+        <a class="btn btn-outline-secondary" href="{% url 'invoices:detail' invoice.pk %}">К накладной</a>
+      {% else %}
+        <p>Отмена уменьшит остатки по всем позициям этой накладной. Документ останется в журнале.</p>
+        <form method="post">
+          {% csrf_token %}
+          {% if form.non_field_errors %}<div class="alert alert-danger" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+          {% include 'spares/invoices/field.html' with field=form.reason %}
+          <div class="d-flex gap-2 flex-wrap mt-3">
+            <button class="btn btn-danger" type="submit">Подтвердить отмену</button>
+            <a class="btn btn-outline-secondary" href="{% url 'invoices:detail' invoice.pk %}">Назад</a>
+          </div>
+        </form>
+      {% endif %}
+    </section>
+  </main>
+{% endblock %}

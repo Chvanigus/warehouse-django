@@ -7,7 +7,7 @@ from django.urls import reverse
 
 from spares.forms import StockForm, WriteOffForm
 from spares.models import (
-    Company, Contractors, MachineWorker, Movement, Receipt, Spares, Stock, Warehouses,
+    Company, Contractors, MachineWorker, Receipt, Spares, Stock, Warehouses,
     Workers, WriteOff,
 )
 
@@ -66,7 +66,7 @@ class WarehouseOperationTests(TestCase):
         self.assertContains(response, 'Конец периода должен быть не раньше начала')
         self.assertNotContains(response, 'НК-100')
 
-    def test_operator_can_create_move_and_delete_receipt(self):
+    def test_operator_can_create_and_cancel_receipt_without_overwriting_it(self):
         self.client.force_login(self.operator)
         receipt = self.add_receipt()
         self.assertEqual(receipt.amount, Decimal('60.00'))
@@ -78,17 +78,23 @@ class WarehouseOperationTests(TestCase):
             {**self.receipt_data, 'warehouse': self.destination.pk},
         )
         self.assertRedirects(response, reverse('operations:receipts'))
-        self.assertEqual(Movement.objects.get().to_warehouse, self.destination)
-        self.assertContains(self.client.get(reverse('operations:movements')), self.destination.name)
-        self.assertEqual(Stock.objects.get(warehouse=self.destination).actual_balance, Decimal('8'))
+        receipt.refresh_from_db()
+        self.assertEqual(receipt.warehouse, self.warehouse)
+        self.assertFalse(Stock.objects.filter(warehouse=self.destination).exists())
 
-        delete_url = reverse('operations:receipt_delete', args=[receipt.pk])
-        self.assertContains(self.client.get(delete_url), 'Удаление записи')
-        self.assertTrue(Receipt.objects.filter(pk=receipt.pk).exists())
-        self.assertRedirects(self.client.post(delete_url), reverse('operations:receipts'))
-        self.assertFalse(Receipt.objects.exists())
+        cancel_url = reverse('operations:receipt_cancel', args=[receipt.pk])
+        self.assertContains(self.client.get(cancel_url), 'Отмена документа')
+        self.assertEqual(self.client.post(cancel_url).status_code, 200)
+        self.assertRedirects(self.client.post(cancel_url, {'reason': 'Ошибочная накладная'}), reverse('operations:receipts'))
+        receipt.refresh_from_db()
+        self.assertEqual(receipt.cancelled_by, self.operator)
+        self.assertEqual(receipt.cancellation_reason, 'Ошибочная накладная')
+        self.assertEqual(receipt.quantity, Decimal('8'))
+        self.assertEqual(Stock.objects.get(warehouse=self.warehouse).actual_balance, Decimal('0'))
+        self.assertEqual(self.client.post(cancel_url, {'reason': 'Повтор'}).status_code, 404)
+        self.assertContains(self.client.get(reverse('operations:receipts')), 'Ошибочная накладная')
 
-    def test_writeoff_validation_and_edit_of_existing_assignment(self):
+    def test_writeoff_validation_and_cancellation(self):
         self.client.force_login(self.operator)
         receipt = self.add_receipt()
         stock = Stock.objects.get()
@@ -107,13 +113,11 @@ class WarehouseOperationTests(TestCase):
         writeoff = WriteOff.objects.get()
         self.assertEqual(writeoff.worker, self.assignment.worker)
         self.assertEqual(writeoff.total_amount, Decimal('60.00'))
-        edit_url = reverse('operations:writeoff_edit', args=[writeoff.pk])
-        form = self.client.get(edit_url).context['form']
+        form = WriteOffForm(instance=writeoff)
         self.assertEqual(form.initial['spares_list'], stock)
         self.assertEqual(form.initial['machine_list'], self.assignment)
-        self.assertRedirects(self.client.post(edit_url, writeoff_data), reverse('operations:writeoffs'))
 
-        response = self.client.post(reverse('operations:receipt_delete', args=[receipt.pk]))
+        response = self.client.post(reverse('operations:receipt_cancel', args=[receipt.pk]), {'reason': 'Отмена'})
         self.assertContains(response, 'Количество превышает доступный остаток')
         self.assertTrue(Receipt.objects.filter(pk=receipt.pk).exists())
 
@@ -122,9 +126,8 @@ class WarehouseOperationTests(TestCase):
             **writeoff_data, 'machine_list': '', 'quantity': '7',
         })
         self.assertTrue(stale_assignment_form.is_valid(), stale_assignment_form.errors)
-        self.assertEqual(stale_assignment_form.save().worker, self.assignment.worker)
         self.assertRedirects(
-            self.client.post(reverse('operations:writeoff_delete', args=[writeoff.pk])),
+            self.client.post(reverse('operations:writeoff_cancel', args=[writeoff.pk]), {'reason': 'Ошибочная выдача'}),
             reverse('operations:writeoffs'),
         )
         stock.refresh_from_db()
@@ -149,9 +152,7 @@ class WarehouseOperationTests(TestCase):
         })
         self.assertIsNone(self.client.get(url, {'stock': stock.pk}).context['form']['spares_list'].value())
         edit_url = reverse('operations:writeoff_edit', args=[WriteOff.objects.get().pk])
-        response = self.client.get(edit_url)
-        self.assertContains(response, 'data-balance="0.00"')
-        self.assertContains(response, 'data-available="8.00"')
+        self.assertRedirects(self.client.get(edit_url), reverse('operations:writeoffs'))
 
     def test_stock_form_keeps_existing_identity(self):
         self.client.force_login(self.operator)
@@ -170,8 +171,8 @@ class WarehouseOperationTests(TestCase):
         updated = form.save()
         self.assertEqual(updated.warehouse, self.warehouse)
         self.assertEqual(updated.price, Decimal('7.50'))
-        self.assertEqual(updated.inventory, 7)
-        self.assertTrue(updated.discrepancy)
+        self.assertIsNone(updated.inventory)
+        self.assertEqual(updated.plan, 'Сверить')
 
     def test_admin_uses_shared_writeoff_form_and_searchable_assignments(self):
         staff = get_user_model().objects.create_superuser(username='warehouse-admin')
@@ -192,6 +193,6 @@ class WarehouseOperationTests(TestCase):
         self.assertRedirects(response, reverse('admin:spares_writeoff_changelist'))
 
         delete_url = reverse('admin:spares_receipt_delete', args=[receipt.pk])
-        response = self.client.post(delete_url, {'post': 'yes'}, follow=True)
-        self.assertContains(response, 'Количество превышает доступный остаток')
+        response = self.client.post(delete_url, {'post': 'yes'})
+        self.assertEqual(response.status_code, 403)
         self.assertTrue(Receipt.objects.filter(pk=receipt.pk).exists())

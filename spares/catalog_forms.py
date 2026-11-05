@@ -3,6 +3,25 @@ from django.core import signing
 
 from .forms import StockForm
 
+STOCK_REVISION_SALT = 'spares.stock.correction'
+
+
+def stock_version(stock):
+    return [
+        stock.pk, str(stock.actual_balance), str(stock.input_quantity), str(stock.output_quantity),
+        stock.plan, str(stock.inventory), str(stock.inventory_book_balance),
+    ]
+
+
+def validate_stock_version(token, expected):
+    try:
+        revision = signing.loads(token, salt=STOCK_REVISION_SALT)
+    except signing.BadSignature:
+        revision = None
+    if revision != expected:
+        raise forms.ValidationError('Остаток изменился после открытия формы. Откройте актуальную запись и повторите операцию.')
+    return token
+
 
 class ManualStockForm(StockForm):
     reason = forms.CharField(
@@ -27,25 +46,11 @@ class ManualStockForm(StockForm):
 
 class StockCorrectionForm(ManualStockForm):
     revision = forms.CharField(widget=forms.HiddenInput, required=False)
-    revision_salt = 'spares.stock.correction'
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        stock = self.instance
-        self.stock_revision = [
-            stock.pk, str(stock.actual_balance), str(stock.input_quantity), str(stock.output_quantity),
-            stock.plan, str(stock.inventory),
-        ]
-        self.initial['revision'] = signing.dumps(self.stock_revision, salt=self.revision_salt)
+        self.stock_revision = stock_version(self.instance)
+        self.initial['revision'] = signing.dumps(self.stock_revision, salt=STOCK_REVISION_SALT)
 
     def clean_revision(self):
-        token = self.cleaned_data['revision']
-        try:
-            revision = signing.loads(token, salt=self.revision_salt)
-        except signing.BadSignature:
-            revision = None
-        if revision != self.stock_revision:
-            raise forms.ValidationError(
-                'Остаток изменился после открытия формы. Откройте актуальную запись и повторите корректировку.',
-            )
-        return token
+        return validate_stock_version(self.cleaned_data['revision'], self.stock_revision)

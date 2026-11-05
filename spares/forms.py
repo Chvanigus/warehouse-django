@@ -27,7 +27,7 @@ class StockForm(forms.ModelForm):
         model = Stock
         fields = (
             'spare', 'warehouse', 'company', 'measure', 'price',
-            'actual_balance', 'plan', 'inventory',
+            'actual_balance', 'plan',
         )
 
 
@@ -158,3 +158,9 @@ class JournalFilterForm(forms.Form):
         if start and end and start > end:
             self.add_error('date_to', 'Конец периода должен быть не раньше начала.')
         return data
+
+
+class StockJournalFilterForm(JournalFilterForm):
+    stock = forms.IntegerField(
+        label='Позиция', required=False, min_value=1, max_value=2**63 - 1, widget=forms.HiddenInput,
+    )

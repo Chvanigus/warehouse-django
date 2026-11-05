@@ -1,6 +1,4 @@
 """Views for the warehouse dashboard and reports."""
-import re
-
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.db.models import Count, Q, Sum
 from django.utils import timezone
@@ -10,6 +8,7 @@ from django.views.generic import ListView, TemplateView
 from spares.context_processors.income_outcome_report import get_income_report, get_outcome_report
 from spares.models import Receipt, Stock, WriteOff
 from spares.report_forms import ContractorsReportForm, MachineReportForm, StockFilterForm, TrailersReportForm
+from spares.threshold_models import StockMinimum
 
 
 class WarehouseMainView(LoginRequiredMixin, TemplateView):
@@ -28,7 +27,7 @@ class WarehouseMainView(LoginRequiredMixin, TemplateView):
             )
         for model, name in ((Receipt, 'receipt'), (WriteOff, 'writeoff')):
             if user.has_perm(f'spares.view_{name}'):
-                entries = model.objects.filter(date__lte=today)
+                entries = model.objects.filter(date__lte=today, cancelled_at__isnull=True)
                 context[f'{name}_count'] = entries.filter(date__gte=month_start).count()
                 context[f'recent_{name}s'] = entries.select_related('spare', 'warehouse', 'measure').order_by(
                     '-date', '-pk',
@@ -52,6 +51,7 @@ class FilteredReportView(WarehouseReportMixin, ListView):
         return (
             self.model.objects.filter(
                 date__range=data['date_range'],
+                cancelled_at__isnull=True,
                 **{self.model_field: data[self.form_field]},
             )
             .select_related(*self.related_fields)
@@ -117,20 +117,8 @@ class StockReportView(WarehouseReportMixin, ListView):
         return StockFilterForm(self.request.GET or None)
 
     def get_queryset(self):
-        queryset = super().get_queryset()
-        if not self.form.is_bound:
-            return queryset
-        if not self.form.is_valid():
-            return queryset.none()
-
-        filters = self.form.cleaned_data
-        if filters['q']:
-            queryset = queryset.filter(spare__name__iregex=re.escape(filters['q']))
-        if filters['warehouse']:
-            queryset = queryset.filter(warehouse=filters['warehouse'])
-        if filters['company']:
-            queryset = queryset.filter(company=filters['company'])
-        if filters['discrepancy']:
+        queryset = self.form.filter_groups(super().get_queryset())
+        if self.form.is_valid() and self.form.cleaned_data['discrepancy']:
             queryset = queryset.filter(inventory__isnull=False, discrepancy=True)
         return queryset
 
@@ -142,6 +130,9 @@ class StockReportView(WarehouseReportMixin, ListView):
             discrepancies=Count('pk', filter=Q(inventory__isnull=False, discrepancy=True)),
             unavailable=Count('pk', filter=Q(actual_balance__lte=0)),
         )
+        if self.request.user.has_perm('spares.view_stockminimum'):
+            rules = self.form.filter_groups(StockMinimum.objects.with_available())
+            context['replenishment_count'] = rules.below_minimum().count()
         return context
 
 

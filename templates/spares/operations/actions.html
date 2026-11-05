@@ -1,6 +1,9 @@
-{% if can_change or can_delete %}
+{% if entry.invoice_id or can_cancel and not entry.cancelled_at %}
   <div class="operation-record-actions">
-    {% if can_change %}<a href="{% url edit_route entry.pk %}" class="btn btn-sm btn-outline-primary">Изменить</a>{% endif %}
-    {% if can_delete %}<a href="{% url delete_route entry.pk %}" class="btn btn-sm btn-outline-danger">Удалить</a>{% endif %}
+    {% if entry.invoice_id %}
+      <a href="{% url 'invoices:detail' entry.invoice_id %}" class="btn btn-sm btn-outline-primary">Накладная</a>
+    {% elif can_cancel and not entry.cancelled_at %}
+      <a href="{% url cancel_route entry.pk %}" class="btn btn-sm btn-outline-danger">Отменить документ</a>
+    {% endif %}
   </div>
 {% endif %}

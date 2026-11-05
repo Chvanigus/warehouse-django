@@ -41,10 +41,18 @@ class StockOperationAdmin(admin.ModelAdmin):
         return HttpResponseRedirect(request.get_full_path())
 
 
+class PostedOperationAdmin(StockOperationAdmin):
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
 @admin.register(Spares)
 class SparesAdmin(admin.ModelAdmin):
-    list_display = ('name',)
-    search_fields = ('name',)
+    list_display = ('name', 'sku')
+    search_fields = ('name', 'sku')
 
 
 @admin.register(Warehouses)
@@ -97,7 +105,7 @@ class TrailersAdmin(admin.ModelAdmin):
 
 
 @admin.register(Receipt)
-class ReceiptAdmin(StockOperationAdmin):
+class ReceiptAdmin(PostedOperationAdmin):
     form = ReceiptForm
     list_display = (
         'spare',
@@ -145,6 +153,8 @@ class StockAdmin(StockOperationAdmin):
         'input_quantity',
         'output_quantity',
         'discrepancy',
+        'inventory',
+        'inventory_book_balance',
     )
     autocomplete_fields = ('spare', 'warehouse', 'company')
     list_select_related = ('spare', 'measure', 'company', 'warehouse')
@@ -161,7 +171,7 @@ class StockAdmin(StockOperationAdmin):
 
 
 @admin.register(WriteOff)
-class WriteOffAdmin(StockOperationAdmin):
+class WriteOffAdmin(PostedOperationAdmin):
     form = WriteOffForm
     list_display = (
         'spare',

@@ -11,6 +11,7 @@
     </p>
     <h3>{{ entry.spare }}</h3>
     <p class="muted-copy">{{ entry.worker }}{% if entry.machine %} · {{ entry.machine }}{% endif %}{% if entry.trailer %} · {{ entry.trailer }}{% endif %}</p>
+    {% include 'spares/operations/cancelled.html' %}
   </div>
   <dl class="operation-record-facts">
     <div>

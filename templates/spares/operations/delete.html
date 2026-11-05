@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}Удаление · {{ list_title }}{% endblock %}
+{% block title %}Отмена · {{ list_title }}{% endblock %}
 {% block extra_css %}<link rel="stylesheet" href="{% static 'css/operations.css' %}">{% endblock %}
 
 {% block content %}
@@ -9,7 +9,7 @@
     <div class="page-heading operation-heading">
       <div>
         <p class="eyebrow">{{ list_title }} · Запись № {{ object.pk }}</p>
-        <h1>Удаление записи</h1>
+        <h1>Отмена документа</h1>
       </div>
       <a href="{{ list_url }}" class="btn btn-outline-secondary">К журналу</a>
     </div>
@@ -18,9 +18,9 @@
       <p>{{ object.date|date:"d.m.Y" }} · {{ object.warehouse }} · {{ object.quantity|floatformat:'-2' }} {{ object.measure|default_if_none:'' }}</p>
       <p class="muted-copy">
         {% if operation_name == 'receipt' %}
-          Удаление прихода уменьшит остаток на указанное количество.
+          Отмена прихода уменьшит остаток на указанное количество.
         {% else %}
-          Удаление списания вернёт указанное количество на склад.
+          Отмена списания вернёт указанное количество на склад.
         {% endif %}
       </p>
       <form method="post">
@@ -28,9 +28,14 @@
         {% if form.non_field_errors %}
           <div class="alert alert-danger" role="alert">{{ form.non_field_errors }}</div>
         {% endif %}
+        <div class="mb-3">
+          {{ form.reason.label_tag }}
+          {{ form.reason }}
+          {% if form.reason.errors %}<div class="text-danger" role="alert">{{ form.reason.errors }}</div>{% endif %}
+        </div>
         <div class="operation-form-actions">
-          <button type="submit" class="btn btn-danger">Удалить запись</button>
-          <a href="{{ list_url }}" class="btn btn-outline-secondary">Отмена</a>
+          <button type="submit" class="btn btn-danger">Отменить документ</button>
+          <a href="{{ list_url }}" class="btn btn-outline-secondary">Назад</a>
         </div>
       </form>
     </section>

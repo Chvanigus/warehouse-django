@@ -12,7 +12,7 @@
         {% if perms.spares.add_receipt or perms.spares.add_writeoff %}
           <div class="dashboard-actions">
             {% if perms.spares.add_receipt %}
-              <a class="btn btn-primary" href="{% url 'operations:receipt_add' %}">
+              <a class="btn btn-primary" href="{% url 'invoices:add' %}">
                 {% include 'include/icon.html' with name='in' only %} Оформить приход
               </a>
             {% endif %}

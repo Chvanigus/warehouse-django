@@ -69,11 +69,14 @@ class Command(BaseCommand):
             )
 
         retained.plan = next(iter(plans), '')
-        retained.inventory = next(iter(inventories), None)
+        if any(stock.inventory_book_balance is not None for stock in group):
+            retained.inventory = retained.inventory_book_balance = None
+        else:
+            retained.inventory = next(iter(inventories), None)
         totals = ('input_quantity', 'output_quantity', 'actual_balance')
         for field in totals:
             total = sum(getattr(stock, field) for stock in group)
             total = retained._meta.get_field(field).clean(total, retained)
             setattr(retained, field, total)
-        retained.save(update_fields={*totals, 'plan', 'inventory'})
+        retained.save(update_fields={*totals, 'plan', 'inventory', 'inventory_book_balance'})
         Stock.objects.filter(pk__in=ids[1:]).delete()

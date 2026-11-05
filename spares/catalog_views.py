@@ -7,23 +7,26 @@ from django.db import transaction
 from django.db.models import ProtectedError, Q
 from django.http import Http404, HttpResponseRedirect
 from django.urls import reverse
+from django.utils.functional import cached_property
 from django.views.generic import CreateView, DeleteView, ListView, TemplateView, UpdateView
 
 from . import models
 from .catalog_forms import ManualStockForm, StockCorrectionForm
+from .report_forms import StockMinimumFilterForm
 from .stock_adjustments import save_manual_stock
 
 
 CATALOGS = {
     'companies': (models.Company, ('name',)),
     'warehouses': (models.Warehouses, ('name',)),
-    'spares': (models.Spares, ('name',)),
+    'spares': (models.Spares, ('name', 'sku')),
     'measures': (models.MeasureMeasurement, ('name',)),
     'contractors': (models.Contractors, ('name', 'contact', 'contact_name')),
     'workers': (models.Workers, ('name',)),
     'machines': (models.Machines, ('name',)),
     'trailers': (models.Trailers, ('name',)),
     'assignments': (models.MachineWorker, ('worker', 'machine', 'trailer')),
+    'minimums': (models.StockMinimum, ('spare', 'company', 'warehouse', 'measure', 'minimum')),
 }
 
 
@@ -90,6 +93,8 @@ class CatalogListView(CatalogViewMixin, ListView):
                 )
             return queryset
         queryset = queryset.order_by('name', 'pk')
+        if query and self.model is models.Spares:
+            return queryset.filter(Q(name__iregex=query) | Q(sku__iregex=query))
         return queryset.filter(name__iregex=query) if query else queryset
 
     def get_context_data(self, **kwargs):
@@ -108,11 +113,44 @@ class CatalogListView(CatalogViewMixin, ListView):
         return context
 
 
+class StockMinimumListView(CatalogViewMixin, ListView):
+    template_name = 'spares/catalog/minimums.html'
+    context_object_name = 'rules'
+    paginate_by = 30
+
+    @cached_property
+    def filters(self):
+        return StockMinimumFilterForm(self.request.GET or None)
+
+    def get_queryset(self):
+        rules = super().get_queryset().with_available().select_related(
+            'spare', 'company', 'warehouse', 'measure',
+        ).order_by('spare__name', 'warehouse__name', 'company__name', 'pk')
+        rules = self.filters.filter_groups(rules)
+        if self.filters.is_valid() and self.filters.cleaned_data['low']:
+            return rules.below_minimum()
+        return rules
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update(
+            filters=self.filters,
+            can_add=self.request.user.has_perm(model_permission(self.model, 'add')),
+            can_change=self.request.user.has_perm(model_permission(self.model, 'change')),
+            can_delete=self.request.user.has_perm(model_permission(self.model, 'delete')),
+        )
+        return context
+
+
 class CatalogFormMixin(CatalogViewMixin):
     template_name = 'spares/catalog/form.html'
 
     def get_context_data(self, **kwargs):
         return super().get_context_data(title=self.title, **kwargs)
+
+    @transaction.atomic
+    def post(self, request, *args, **kwargs):
+        return super().post(request, *args, **kwargs)
 
     def form_valid(self, form):
         response = super().form_valid(form)

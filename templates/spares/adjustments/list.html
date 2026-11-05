@@ -18,30 +18,7 @@
       {% endif %}
     </div>
 
-    <section class="workspace-panel operation-filters" aria-label="Фильтры корректировок">
-      {% if stock_id %}
-        <p class="mb-3"><span class="badge text-bg-light">Позиция № {{ stock_id }}</span></p>
-      {% endif %}
-      {% if filters.stock.errors %}
-        <div class="alert alert-danger py-2" role="alert">Укажите корректный номер позиции.</div>
-      {% endif %}
-      <form method="get" action="{{ journal_url }}" role="search">
-        {% for field in filters.visible_fields %}
-          <div class="operation-filter">
-            <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
-            {{ field }}
-            {% if field.errors %}<div class="text-danger" role="alert">{{ field.errors }}</div>{% endif %}
-          </div>
-        {% endfor %}
-        <div class="operation-filter-actions">
-          <button type="submit" class="btn btn-primary">Найти</button>
-          {% if filters.has_changed or filters.errors %}
-            <a class="btn btn-outline-secondary" href="{{ journal_url }}">Сбросить</a>
-          {% endif %}
-        </div>
-        {{ filters.stock }}
-      </form>
-    </section>
+    {% include 'spares/journal_filters.html' %}
 
     {% if entries %}
       <section class="workspace-panel operation-journal" aria-labelledby="adjustment-entries">

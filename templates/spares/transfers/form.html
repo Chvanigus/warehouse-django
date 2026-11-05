@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Перемещение запчастей{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="{% static 'libs/select2/css/select2.min.css' %}">
+  <link rel="stylesheet" href="{% static 'css/operations.css' %}">
+{% endblock %}
+
+{% block content %}
+  <main class="workspace operation-workspace">
+    <div class="page-heading">
+      <div>
+        <p class="eyebrow mb-2">Складские операции</p>
+        <h1>Переместить запчасти</h1>
+        <p class="muted-copy mb-0">Укажите исходную позицию, склад назначения и количество.</p>
+      </div>
+    </div>
+    <form method="post" class="workspace-panel operation-form-panel col-12 col-lg-8">
+      {% csrf_token %}
+      {% if form.non_field_errors %}
+        <div class="alert alert-danger" role="alert">{{ form.non_field_errors }}</div>
+      {% endif %}
+      <div class="operation-fields">
+        {% include 'spares/operations/field.html' with field=form.source wide=True %}
+        {% include 'spares/operations/field.html' with field=form.destination wide=True %}
+        {% include 'spares/operations/field.html' with field=form.quantity %}
+        {% include 'spares/operations/field.html' with field=form.date %}
+        {% include 'spares/operations/field.html' with field=form.note wide=True %}
+      </div>
+      <div class="operation-form-footer">
+        <p class="muted-copy"><span class="operation-required" aria-hidden="true">*</span> Обязательные поля</p>
+        <div class="operation-form-actions">
+          <button type="submit" class="btn btn-primary">Провести перемещение</button>
+          {% if perms.spares.view_stocktransfer %}
+            <a href="{% url 'transfers:list' %}" class="btn btn-outline-secondary">Отмена</a>
+          {% elif perms.spares.view_stock %}
+            <a href="{% url 'spares:stock_report' %}" class="btn btn-outline-secondary">Отмена</a>
+          {% else %}
+            <a href="{% url 'spares:warehouse_main' %}" class="btn btn-outline-secondary">Отмена</a>
+          {% endif %}
+        </div>
+      </div>
+    </form>
+  </main>
+{% endblock %}
+
+{% block extra_javascript %}
+  <script src="{% static 'libs/jquery/jquery.min.js' %}"></script>
+  <script src="{% static 'libs/select2/js/select2.min.js' %}"></script>
+  <script src="{% static 'libs/select2/js/i18n/ru.js' %}"></script>
+  <script src="{% static 'js/pages/warehouse-choice.js' %}"></script>
+{% endblock %}

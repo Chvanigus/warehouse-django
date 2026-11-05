@@ -4,9 +4,9 @@ from .forms import OperationReceiptForm, OperationWriteOffForm
 from .models import Movement, Receipt, WriteOff
 from .operation_views import (
     OperationCreateView,
-    OperationDeleteView,
+    OperationCancelView,
     OperationListView,
-    OperationUpdateView,
+    PostedOperationRedirectView,
 )
 
 app_name = 'operations'
@@ -17,11 +17,14 @@ urlpatterns = [
         OperationListView.as_view(
             model=Receipt,
             list_title='Приход',
-            related_fields=('spare', 'measure', 'company', 'warehouse', 'contractor'),
+            related_fields=('spare', 'measure', 'company', 'warehouse', 'contractor', 'invoice'),
             order_by=('-date', '-pk'),
-            search_fields=('spare__name', 'invoice_number', 'warehouse__name', 'contractor__name', 'company__name'),
+            search_fields=(
+                'spare__name', 'spare__sku', 'invoice_number', 'warehouse__name', 'contractor__name', 'company__name',
+            ),
             search_hint='Запчасть, накладная, склад или поставщик',
             add_label='Оформить приход',
+            add_route='invoices:add',
             template_name='spares/operations/receipts.html',
         ),
         name='receipts',
@@ -33,7 +36,7 @@ urlpatterns = [
             list_title='Расход',
             related_fields=('spare', 'measure', 'warehouse', 'company', 'worker', 'machine', 'trailer'),
             order_by=('-date', '-pk'),
-            search_fields=('spare__name', 'warehouse__name', 'worker__name', 'machine__name', 'trailer__name'),
+            search_fields=('spare__name', 'spare__sku', 'warehouse__name', 'worker__name', 'machine__name', 'trailer__name'),
             search_hint='Запчасть, склад, работник или техника',
             add_label='Оформить списание',
             template_name='spares/operations/writeoffs.html',
@@ -71,12 +74,17 @@ for model, form_class, title in (
         ),
         path(
             f'{prefix}<int:pk>/edit/',
-            OperationUpdateView.as_view(model=model, form_class=form_class, list_title=title),
+            PostedOperationRedirectView.as_view(model=model),
             name=f'{name}_edit',
         ),
         path(
             f'{prefix}<int:pk>/delete/',
-            OperationDeleteView.as_view(model=model, list_title=title),
+            OperationCancelView.as_view(model=model, list_title=title),
             name=f'{name}_delete',
+        ),
+        path(
+            f'{prefix}<int:pk>/cancel/',
+            OperationCancelView.as_view(model=model, list_title=title),
+            name=f'{name}_cancel',
         ),
     ]

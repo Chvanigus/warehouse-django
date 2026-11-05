@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Предпросмотр накладной{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/operations.css' %}">{% endblock %}
+
+{% block content %}
+  <main class="workspace operation-workspace">
+    <div class="page-heading operation-heading">
+      <div>
+        <p class="eyebrow">Импорт XLSX</p>
+        <h1>Предпросмотр накладной</h1>
+        <p class="muted-copy">Проверьте данные перед тем, как они попадут в остатки.</p>
+      </div>
+    </div>
+    <section class="workspace-panel operation-form-panel mb-3">
+      <h2>Накладная № {{ header.number }}</h2>
+      <p>{{ header.date|date:"d.m.Y" }} · {{ header.contractor }} · {{ header.company }} · {{ header.warehouse }}</p>
+      {% include 'spares/invoices/line_table.html' %}
+    </section>
+    <form method="post" action="{% url 'invoices:upload' %}" class="d-flex flex-wrap gap-2">
+      {% csrf_token %}
+      <input type="hidden" name="confirmation" value="{{ confirmation }}">
+      <button class="btn btn-primary" type="submit">Провести накладную</button>
+      <a class="btn btn-outline-secondary" href="{% url 'invoices:upload' %}">Загрузить другой файл</a>
+    </form>
+  </main>
+{% endblock %}

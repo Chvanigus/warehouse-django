@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Инвентаризация{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/operations.css' %}">{% endblock %}
+
+{% block content %}
+  {% url 'inventory:list' as journal_url %}
+  <main class="workspace operation-workspace">
+    <div class="page-heading operation-heading">
+      <div>
+        <p class="eyebrow mb-2">Складской учёт</p>
+        <h1>Инвентаризация</h1>
+        <p class="muted-copy">История пересчётов и расхождений на момент сверки.</p>
+      </div>
+      {% if perms.spares.view_stock %}
+        <a class="btn btn-outline-primary" href="{% url 'spares:stock_report' %}">К остаткам</a>
+      {% endif %}
+    </div>
+    {% include 'spares/journal_filters.html' %}
+
+    <section class="workspace-panel operation-journal" aria-labelledby="inventory-entries">
+      <div class="operation-journal-head">
+        <h2 id="inventory-entries">Пересчёты</h2>
+        {% if entries %}<span class="muted-copy">Найдено {{ paginator.count }}</span>{% endif %}
+      </div>
+      {% if entries %}
+        <ol class="operation-records list-unstyled mb-0">
+          {% for entry in entries %}
+            <li class="operation-record">
+              <div class="operation-record-main">
+                <time class="operation-record-date" datetime="{{ entry.counted_at|date:'c' }}">{{ entry.counted_at|date:'d.m.Y H:i' }}</time>
+                <h3>{{ entry.stock_label }}</h3>
+                <p class="muted-copy">Пересчитал {{ entry.actor_name }}</p>
+              </div>
+              <dl class="operation-record-facts">
+                <div><dt>По учёту</dt><dd class="operation-quantity">{{ entry.book_quantity|floatformat:'-2' }}</dd></div>
+                <div><dt>Фактически</dt><dd class="operation-quantity">{{ entry.counted_quantity|floatformat:'-2' }}</dd></div>
+                {% with difference=entry.difference %}
+                  <div>
+                    <dt>Расхождение</dt>
+                    <dd class="operation-quantity{% if difference < 0 %} operation-quantity-out{% elif difference > 0 %} operation-quantity-in{% endif %}">
+                      {% if difference > 0 %}+{% endif %}{{ difference|floatformat:'-2' }}
+                    </dd>
+                  </div>
+                {% endwith %}
+                {% if entry.note %}
+                  <div class="operation-field-wide"><dt>Примечание</dt><dd>{{ entry.note|linebreaksbr }}</dd></div>
+                {% endif %}
+              </dl>
+              {% if entry.stock_id and perms.spares.change_stock %}
+                <div class="operation-record-actions">
+                  <a class="btn btn-sm btn-outline-secondary" href="{% url 'catalog:stock-edit' entry.stock_id %}">Корректировка</a>
+                </div>
+              {% endif %}
+            </li>
+          {% endfor %}
+        </ol>
+        {% if is_paginated %}
+          <nav class="operation-pagination" aria-label="Страницы пересчётов">
+            {% if page_obj.has_previous %}<a class="btn btn-sm btn-outline-secondary" href="{% querystring page=page_obj.previous_page_number %}">Назад</a>{% endif %}
+            <span>Страница {{ page_obj.number }} из {{ paginator.num_pages }}</span>
+            {% if page_obj.has_next %}<a class="btn btn-sm btn-outline-secondary" href="{% querystring page=page_obj.next_page_number %}">Далее</a>{% endif %}
+          </nav>
+        {% endif %}
+      {% else %}
+        <p class="muted-copy p-4 mb-0">{% if filters.has_changed or filters.errors %}Пересчёты по этим условиям не найдены.{% else %}Пересчётов пока нет. Запишите фактическое количество из строки остатка.{% endif %}</p>
+      {% endif %}
+    </section>
+  </main>
+{% endblock %}

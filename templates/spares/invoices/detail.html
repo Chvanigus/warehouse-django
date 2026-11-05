@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Накладная № {{ invoice.number }}{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/operations.css' %}">{% endblock %}
+
+{% block content %}
+  <main class="workspace operation-workspace">
+    <div class="page-heading operation-heading">
+      <div>
+        <p class="eyebrow"><a href="{% url 'invoices:list' %}">Накладные</a></p>
+        <h1>Накладная № {{ invoice.number }}</h1>
+        <p class="muted-copy">{{ invoice.date|date:"d.m.Y" }} · {{ invoice.contractor }} · {{ invoice.company }} · {{ invoice.warehouse }}</p>
+      </div>
+      {% if not invoice.cancelled_at and perms.spares.delete_receipt %}
+        <a class="btn btn-outline-danger" href="{% url 'invoices:cancel' invoice.pk %}">Отменить накладную</a>
+      {% endif %}
+    </div>
+    {% if invoice.cancelled_at %}
+      <section class="alert alert-secondary" aria-label="Данные отмены">
+        <p class="mb-1"><strong>Отменена</strong> {{ invoice.cancelled_at|date:"d.m.Y H:i" }} · {{ invoice.cancelled_by_name }}</p>
+        <p class="mb-0">{{ invoice.cancellation_reason|linebreaksbr }}</p>
+      </section>
+    {% else %}
+      <p><span class="badge text-bg-success">Проведена</span> {{ invoice.created_at|date:"d.m.Y H:i" }} · {{ invoice.posted_by_name }}</p>
+    {% endif %}
+    <section class="workspace-panel operation-form-panel">
+      <h2>Позиции</h2>
+      {% include 'spares/invoices/line_table.html' with lines=invoice.lines.all total=invoice.total %}
+    </section>
+  </main>
+{% endblock %}

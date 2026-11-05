@@ -1,0 +1,92 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Перемещения запчастей{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/operations.css' %}">{% endblock %}
+
+{% block content %}
+  {% url 'transfers:list' as transfer_list %}
+  <main class="workspace operation-workspace">
+    <div class="page-heading">
+      <div>
+        <p class="eyebrow mb-2">Журнал операций</p>
+        <h1>Перемещения запчастей</h1>
+        <p class="muted-copy mb-0">Документы о передаче запчастей между складами одной фирмы.</p>
+      </div>
+      <div class="d-flex flex-wrap gap-2">
+        {% if perms.spares.view_movement %}
+          <a href="{% url 'operations:movements' %}" class="btn btn-outline-secondary">История переносов прихода</a>
+        {% endif %}
+        {% if perms.spares.add_stocktransfer %}
+          <a href="{% url 'transfers:add' %}" class="btn btn-primary">Оформить перемещение</a>
+        {% endif %}
+      </div>
+    </div>
+    <section class="workspace-panel operation-filters" aria-label="Фильтры перемещений">
+      <form method="get" role="search">
+        {% for field in filters %}
+          <div class="operation-filter">
+            <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+            {{ field }}
+            {% if field.errors %}<div class="text-danger" role="alert">{{ field.errors }}</div>{% endif %}
+          </div>
+        {% endfor %}
+        <div class="operation-filter-actions">
+          <button type="submit" class="btn btn-primary">Найти</button>
+          {% if filters.has_changed %}<a href="{{ transfer_list }}" class="btn btn-outline-secondary">Сбросить</a>{% endif %}
+        </div>
+      </form>
+    </section>
+    {% if entries %}
+      <section class="workspace-panel operation-journal" aria-labelledby="transfer-entries">
+        <div class="operation-journal-head">
+          <h2 id="transfer-entries">Документы</h2>
+          <span class="muted-copy">Найдено {{ paginator.count }}</span>
+        </div>
+        <ol class="operation-records list-unstyled mb-0">
+          {% for transfer in entries %}
+            <li class="operation-record">
+              <div class="operation-record-main">
+                <p class="operation-record-date">
+                  <time datetime="{{ transfer.date|date:'Y-m-d' }}">{{ transfer.date|date:'d.m.Y' }}</time>
+                  <span>· Документ № {{ transfer.pk }}</span>
+                  {% if transfer.cancelled_at %}<span class="badge text-bg-warning">Отменено</span>{% endif %}
+                </p>
+                <h3>{{ transfer.spare }}</h3>
+                <p class="muted-copy">{{ transfer.company }} · Автор {{ transfer.actor_name }}</p>
+              </div>
+              <dl class="operation-record-facts">
+                <div><dt>Со склада</dt><dd>{{ transfer.from_warehouse }}</dd></div>
+                <div><dt>На склад</dt><dd>{{ transfer.to_warehouse }}</dd></div>
+                <div><dt>Количество</dt><dd class="operation-quantity">{{ transfer.quantity|floatformat:'-2' }} {{ transfer.measure|default_if_none:'' }}</dd></div>
+              </dl>
+              <div class="operation-record-actions">
+                <a href="{% url 'transfers:detail' transfer.pk %}" class="btn btn-sm btn-outline-secondary">Открыть</a>
+              </div>
+            </li>
+          {% endfor %}
+        </ol>
+        {% if is_paginated %}
+          <nav class="operation-pagination" aria-label="Страницы перемещений">
+            {% if page_obj.has_previous %}<a class="btn btn-sm btn-outline-secondary" href="{% querystring page=page_obj.previous_page_number %}">Назад</a>{% endif %}
+            <span>Страница {{ page_obj.number }} из {{ paginator.num_pages }}</span>
+            {% if page_obj.has_next %}<a class="btn btn-sm btn-outline-secondary" href="{% querystring page=page_obj.next_page_number %}">Далее</a>{% endif %}
+          </nav>
+        {% endif %}
+      </section>
+    {% else %}
+      <section class="workspace-panel operation-empty">
+        {% if filters.errors %}
+          <h2>Проверьте фильтры</h2>
+          <p class="muted-copy mb-0">Исправьте отмеченные поля и повторите поиск.</p>
+        {% elif filters.has_changed %}
+          <h2>Перемещения не найдены</h2>
+          <p class="muted-copy mb-0">Измените фильтры, чтобы найти нужный документ.</p>
+        {% else %}
+          <h2>Перемещений пока нет</h2>
+          <p class="muted-copy mb-0">После проведения первый документ появится в этом журнале.</p>
+        {% endif %}
+      </section>
+    {% endif %}
+  </main>
+{% endblock %}

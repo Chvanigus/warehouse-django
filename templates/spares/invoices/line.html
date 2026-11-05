@@ -1,0 +1,11 @@
+<fieldset class="workspace-panel operation-form-panel mb-2" data-invoice-line{% if line.DELETE.value %} hidden{% endif %}>
+  <legend class="h6">Позиция <span data-line-number>{{ line_number }}</span></legend>
+  <div class="operation-fields">
+    {% for field in line.visible_fields %}
+      {% if field.name != 'DELETE' %}{% include 'spares/invoices/field.html' %}{% endif %}
+    {% endfor %}
+  </div>
+  <span hidden>{{ line.DELETE }}</span>
+  {% if line.non_field_errors %}<div class="text-danger mt-2" role="alert" data-field-errors>{{ line.non_field_errors }}</div>{% endif %}
+  <button type="button" class="btn btn-sm btn-outline-secondary mt-3" data-remove-line>Убрать позицию</button>
+</fieldset>

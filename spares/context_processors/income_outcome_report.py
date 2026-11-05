@@ -11,7 +11,8 @@ ZERO = Decimal('0.00')
 
 def _annual_report(model, amount_field):
     rows = (
-        model.objects.annotate(year=ExtractYear('date'), month=ExtractMonth('date'))
+        model.objects.filter(cancelled_at__isnull=True)
+        .annotate(year=ExtractYear('date'), month=ExtractMonth('date'))
         .values('company_id', 'company__name', 'year', 'month')
         .annotate(amount=Sum(amount_field))
         .order_by('company__name', 'company_id', '-year', 'month')

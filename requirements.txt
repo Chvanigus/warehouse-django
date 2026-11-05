@@ -1,11 +1,14 @@
 # Прямые зависимости
 Django==5.2.19
+defusedxml==0.7.1
 gunicorn==26.2.0; platform_system != "Windows"
+openpyxl==3.1.5
 python-dotenv==1.2.4
 whitenoise==6.12.0
 
 # Транзитивные зависимости
 asgiref==3.13.0
+et-xmlfile==2.0.0
 packaging==26.3; platform_system != "Windows"
 sqlparse==0.6.1
 tzdata==2026.6; platform_system == "Windows"

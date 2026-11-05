@@ -1,20 +1,23 @@
 from re import escape
 
+from django import forms
 from django.contrib import messages
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Q
+from django.http import HttpResponseRedirect
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.functional import cached_property
-from django.views.generic import CreateView, DeleteView, ListView, UpdateView
+from django.views.generic import CreateView, DeleteView, ListView, RedirectView
 
 from .forms import JournalFilterForm
-from .models import Stock, WriteOff
+from .models import Receipt, Stock, WriteOff
 
 
 class OperationMixin(PermissionRequiredMixin):
+    model = None
     permission_action = None
     list_title = ''
 
@@ -38,8 +41,7 @@ class OperationMixin(PermissionRequiredMixin):
         context['list_url'] = self.get_success_url()
         context['list_title'] = self.list_title
         context['operation_name'] = self.operation_name
-        context['can_change'] = self.request.user.has_perm(self.permission_for('change'))
-        context['can_delete'] = self.request.user.has_perm(self.permission_for('delete'))
+        context['can_cancel'] = self.request.user.has_perm(self.permission_for('delete'))
         return context
 
 
@@ -54,6 +56,7 @@ class OperationListView(OperationMixin, ListView):
     date_field = 'date'
     search_hint = ''
     add_label = ''
+    add_route = None
 
     @cached_property
     def filters(self):
@@ -85,12 +88,12 @@ class OperationListView(OperationMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['filters'] = self.filters
+        context['today'] = timezone.localdate()
         context['filters_active'] = any(self.request.GET.get(name) for name in self.filters.fields)
         if self.allow_add and self.request.user.has_perm(self.permission_for('add')):
-            context['add_url'] = reverse(f'operations:{self.operation_name}_add')
+            context['add_url'] = reverse(self.add_route or f'operations:{self.operation_name}_add')
             context['add_label'] = self.add_label
-        context['edit_route'] = f'operations:{self.operation_name}_edit'
-        context['delete_route'] = f'operations:{self.operation_name}_delete'
+        context['cancel_route'] = f'operations:{self.operation_name}_cancel'
         return context
 
 
@@ -129,21 +132,40 @@ class OperationCreateView(OperationEditMixin, CreateView):
         return initial
 
 
-class OperationUpdateView(OperationEditMixin, UpdateView):
-    permission_action = 'change'
+class PostedOperationRedirectView(OperationMixin, RedirectView):
+    permission_action = 'view'
+
+    def get_redirect_url(self, *args, **kwargs):
+        return self.get_success_url()
 
 
-class OperationDeleteView(OperationMixin, DeleteView):
+class OperationCancellationForm(forms.Form):
+    reason = forms.CharField(
+        label='Причина отмены', max_length=500,
+        widget=forms.Textarea(attrs={'rows': 3, 'class': 'form-control'}),
+    )
+
+
+class OperationCancelView(OperationMixin, DeleteView):
     permission_action = 'delete'
     template_name = 'spares/operations/delete.html'
+    form_class = OperationCancellationForm
     http_method_names = ['get', 'head', 'post', 'options']
+
+    def get_permission_required(self):
+        return (self.permission_for('view'), self.permission_for('delete'))
+
+    def get_queryset(self):
+        entries = super().get_queryset().filter(cancelled_at__isnull=True)
+        if self.model is Receipt:
+            entries = entries.filter(invoice_id__isnull=True)
+        return entries
 
     def form_valid(self, form):
         try:
-            with transaction.atomic():
-                response = super().form_valid(form)
+            self.object.cancel(actor=self.request.user, reason=form.cleaned_data['reason'])
         except ValidationError as error:
             form.add_error(None, ValidationError(error.messages))
             return self.form_invalid(form)
-        messages.success(self.request, 'Запись удалена.')
-        return response
+        messages.success(self.request, 'Документ отменён. Запись сохранена в журнале.')
+        return HttpResponseRedirect(self.get_success_url())

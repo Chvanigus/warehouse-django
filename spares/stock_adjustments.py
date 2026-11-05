@@ -6,6 +6,14 @@ from django.db import router, transaction
 from .models import Stock, StockAdjustment
 
 
+def stock_identity_label(stock):
+    labels = [str(stock.spare), str(stock.warehouse), str(stock.company)]
+    if stock.measure_id is not None:
+        labels.append(str(stock.measure))
+    labels.append(f"Цена {Stock.key_for(stock)['price']:.2f}")
+    return ' · '.join(labels)
+
+
 def save_manual_stock(stock, *, actor, reason):
     """Сохранить ручной ввод остатка и историю изменения одной транзакцией."""
     using = router.db_for_write(Stock, instance=stock)
@@ -35,12 +43,8 @@ def save_manual_stock(stock, *, actor, reason):
 
         stock.save(using=using, force_insert=opening)
         if before != after:
-            labels = [str(stock.spare), str(stock.warehouse), str(stock.company)]
-            if stock.measure_id is not None:
-                labels.append(str(stock.measure))
-            labels.append(f"Цена {Stock.key_for(stock)['price']:.2f}")
             StockAdjustment.objects.using(using).create(
-                stock=stock, stock_label=' · '.join(labels),
+                stock=stock, stock_label=stock_identity_label(stock),
                 actor=actor, actor_name=actor.get_username(),
                 before=before, after=after, reason=reason,
             )

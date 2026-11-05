@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Отмена перемещения{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/operations.css' %}">{% endblock %}
+
+{% block content %}
+  {% url 'transfers:detail' transfer.pk as detail_url %}
+  <main class="workspace operation-workspace">
+    <div class="page-heading operation-heading">
+      <div>
+        <p class="eyebrow">Перемещение № {{ transfer.pk }}</p>
+        <h1>Отмена перемещения</h1>
+      </div>
+      <a href="{{ detail_url }}" class="btn btn-outline-secondary">К документу</a>
+    </div>
+    <section class="workspace-panel operation-confirm">
+      <h2>{{ transfer.spare }}</h2>
+      <p>
+        Количество {{ transfer.quantity|floatformat:'-2' }} {{ transfer.measure|default_if_none:'' }}
+        вернётся со склада «{{ transfer.to_warehouse }}» на склад «{{ transfer.from_warehouse }}».
+      </p>
+      <form method="post">
+        {% csrf_token %}
+        {% if form.non_field_errors %}
+          <div class="alert alert-danger" role="alert">{{ form.non_field_errors }}</div>
+        {% endif %}
+        <div class="mb-3">
+          {{ form.reason.label_tag }}
+          {{ form.reason }}
+          {% if form.reason.errors %}<div class="text-danger" role="alert">{{ form.reason.errors }}</div>{% endif %}
+        </div>
+        <div class="operation-form-actions">
+          <button type="submit" class="btn btn-danger">Отменить перемещение</button>
+          <a href="{{ detail_url }}" class="btn btn-outline-secondary">Назад</a>
+        </div>
+      </form>
+    </section>
+  </main>
+{% endblock %}

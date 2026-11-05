@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Импорт накладной из XLSX{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/operations.css' %}">{% endblock %}
+
+{% block content %}
+  <main class="workspace operation-workspace">
+    <div class="page-heading operation-heading">
+      <div>
+        <p class="eyebrow">Приход</p>
+        <h1>Импорт накладной из XLSX</h1>
+        <p class="muted-copy">Проверьте позиции в предпросмотре перед проведением.</p>
+      </div>
+      <a class="btn btn-outline-secondary" href="{% url 'invoices:add' %}">Заполнить вручную</a>
+    </div>
+    {% if confirmation_failed %}
+      <div class="alert alert-warning" role="alert">Накладная не проведена. Проверьте реквизиты и загрузите файл заново.</div>
+    {% endif %}
+    <form class="workspace-panel operation-form-panel" method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+      <h2>Реквизиты</h2>
+      {% include 'spares/invoices/header_fields.html' %}
+      <hr>
+      <h2>Позиции</h2>
+      <p><a href="{% url 'invoices:template' %}">Скачать шаблон XLSX</a></p>
+      <p class="muted-copy">До 100 строк и 2 МБ. Укажите артикул или точное название запчасти из справочника.
+        Единица измерения может быть пустой. Для количества и цены допускаются до двух знаков после запятой.</p>
+      {% if form.workbook %}
+        {% include 'spares/invoices/field.html' with field=form.workbook %}
+        <button class="btn btn-primary mt-3" type="submit">Показать предпросмотр</button>
+      {% else %}
+        <a class="btn btn-primary" href="{% url 'invoices:upload' %}">Загрузить новый файл</a>
+      {% endif %}
+    </form>
+  </main>
+{% endblock %}

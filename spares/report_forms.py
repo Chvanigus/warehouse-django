@@ -1,8 +1,10 @@
 """Validated month and object filters for warehouse reports."""
 import calendar
 from datetime import date
+from re import escape
 
 from django import forms
+from django.db.models import Q
 
 from spares.models import Company, Contractors, Machines, Trailers, Warehouses
 
@@ -87,13 +89,13 @@ class ContractorsReportForm(ReportFilterForm):
     )
 
 
-class StockFilterForm(forms.Form):
+class StockGroupFilterForm(forms.Form):
     q = forms.CharField(
-        label='Запчасть',
+        label='Запчасть или артикул',
         max_length=255,
         required=False,
         widget=forms.TextInput(attrs={
-            'class': 'form-control', 'type': 'search', 'placeholder': 'Например, масляный фильтр',
+            'class': 'form-control', 'type': 'search', 'placeholder': 'Например, масляный фильтр или LF-9009',
         }),
     )
     warehouse = forms.ModelChoiceField(
@@ -110,8 +112,35 @@ class StockFilterForm(forms.Form):
         empty_label='Все фирмы',
         widget=forms.Select(attrs={'class': 'form-select'}),
     )
+
+    def filter_groups(self, queryset):
+        if not self.is_bound:
+            return queryset
+        if not self.is_valid():
+            return queryset.none()
+
+        filters = self.cleaned_data
+        if filters['q']:
+            pattern = escape(filters['q'])
+            queryset = queryset.filter(Q(spare__name__iregex=pattern) | Q(spare__sku__iregex=pattern))
+        if filters['warehouse']:
+            queryset = queryset.filter(warehouse=filters['warehouse'])
+        if filters['company']:
+            queryset = queryset.filter(company=filters['company'])
+        return queryset
+
+
+class StockFilterForm(StockGroupFilterForm):
     discrepancy = forms.BooleanField(
         label='Только расхождения',
+        required=False,
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+    )
+
+
+class StockMinimumFilterForm(StockGroupFilterForm):
+    low = forms.BooleanField(
+        label='Только к пополнению',
         required=False,
         widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
     )

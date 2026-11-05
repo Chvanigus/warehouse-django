@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Накладные прихода{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/operations.css' %}">{% endblock %}
+
+{% block content %}
+  <main class="workspace operation-workspace">
+    <div class="page-heading operation-heading">
+      <div>
+        <p class="eyebrow">Приход</p>
+        <h1>Накладные</h1>
+        <p class="muted-copy">Многострочные поставки, их позиции и история отмены.</p>
+      </div>
+      <div class="d-flex flex-wrap gap-2">
+        <a class="btn btn-outline-secondary" href="{% url 'operations:receipts' %}">Все приходы</a>
+        {% if perms.spares.add_receipt %}
+          <a class="btn btn-outline-primary" href="{% url 'invoices:upload' %}">Импорт XLSX</a>
+          <a class="btn btn-primary" href="{% url 'invoices:add' %}">Новая накладная</a>
+        {% endif %}
+      </div>
+    </div>
+
+    <section class="workspace-panel operation-filters" aria-label="Фильтры накладных">
+      <form method="get" role="search">
+        {% for field in filters.visible_fields %}
+          <div class="operation-filter">{% include 'spares/invoices/field.html' %}</div>
+        {% endfor %}
+        <div class="operation-filter-actions">
+          <button class="btn btn-primary" type="submit">Найти</button>
+          {% if filters.has_changed or filters.errors %}
+            <a class="btn btn-outline-secondary" href="{% url 'invoices:list' %}">Сбросить</a>
+          {% endif %}
+        </div>
+      </form>
+    </section>
+
+    {% if invoices %}
+      <section class="workspace-panel operation-journal" aria-label="Результаты поиска">
+        <div class="operation-journal-head"><h2>Документы</h2><span class="muted-copy">Найдено {{ paginator.count }}</span></div>
+        <ol class="operation-records list-unstyled mb-0">
+          {% for invoice in invoices %}
+            <li class="operation-record">
+              <div class="operation-record-main">
+                <time class="operation-record-date" datetime="{{ invoice.date|date:'Y-m-d' }}">{{ invoice.date|date:'d.m.Y' }}</time>
+                <h3><a href="{% url 'invoices:detail' invoice.pk %}">Накладная № {{ invoice.number }}</a></h3>
+                <p class="muted-copy">{{ invoice.contractor }} · {{ invoice.warehouse }}</p>
+              </div>
+              <dl class="operation-record-facts">
+                <div><dt>Позиций</dt><dd>{{ invoice.line_count }}</dd></div>
+                <div><dt>Сумма</dt><dd>{{ invoice.total|floatformat:"2" }}</dd></div>
+                <div><dt>Статус</dt><dd>
+                  {% if invoice.cancelled_at %}<span class="badge text-bg-secondary">Отменена</span>
+                  {% else %}<span class="badge text-bg-success">Проведена</span>{% endif %}
+                </dd></div>
+              </dl>
+            </li>
+          {% endfor %}
+        </ol>
+        {% if is_paginated %}
+          <nav class="operation-pagination" aria-label="Страницы накладных">
+            {% if page_obj.has_previous %}<a class="btn btn-sm btn-outline-secondary" href="{% querystring page=page_obj.previous_page_number %}">Назад</a>{% endif %}
+            <span>Страница {{ page_obj.number }} из {{ paginator.num_pages }}</span>
+            {% if page_obj.has_next %}<a class="btn btn-sm btn-outline-secondary" href="{% querystring page=page_obj.next_page_number %}">Далее</a>{% endif %}
+          </nav>
+        {% endif %}
+      </section>
+    {% else %}
+      <section class="workspace-panel operation-empty">
+        <h2>{% if filters.errors %}Проверьте фильтры{% elif filters.has_changed %}Накладные не найдены{% else %}Накладных пока нет{% endif %}</h2>
+        <p class="muted-copy">Проведите новую поставку или проверьте фильтры поиска.</p>
+      </section>
+    {% endif %}
+  </main>
+{% endblock %}

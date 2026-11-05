@@ -19,11 +19,13 @@ class DashboardTests(TestCase):
         warehouse = Warehouses.objects.create(name='Основной')
         spare = Spares.objects.create(name='Колодки')
         contractor = Contractors.objects.create(name='Поставщик')
-        for operation_date in (date(2026, 10, 28), date(2026, 11, 2), date(2026, 11, 30)):
-            Receipt.objects.create(
+        for operation_date in (date(2026, 10, 28), date(2026, 11, 2), date(2026, 11, 3)):
+            receipt = Receipt.objects.create(
                 company=company, warehouse=warehouse, spare=spare, contractor=contractor,
                 date=operation_date, quantity=1,
             )
+        # The former version allowed a future date on an already posted entry.
+        Receipt.objects.filter(pk=receipt.pk).update(date=date(2026, 11, 30))
         stock = Stock.objects.get()
         stock.inventory = 2
         stock.save(update_fields=['inventory'])
@@ -34,5 +36,5 @@ class DashboardTests(TestCase):
         self.assertEqual(len(response.context['recent_receipts']), 2)
         self.assertEqual(response.context['stock_summary'], {'positions': 1, 'discrepancies': 1})
         self.assertContains(response, reverse('spares:stock_report') + '?discrepancy=1')
-        self.assertNotContains(response, reverse('operations:receipt_add'))
+        self.assertNotContains(response, reverse('invoices:add'))
         self.assertNotContains(response, reverse('operations:writeoffs'))

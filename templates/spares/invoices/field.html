@@ -1,0 +1,10 @@
+{% load user_filters %}
+<div class="operation-field">
+  <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+  {% if field.field.widget.template_name == 'django/forms/widgets/select.html' %}
+    {{ field|addclass:'form-select' }}
+  {% else %}
+    {{ field|addclass:'form-control' }}
+  {% endif %}
+  {% if field.errors %}<div class="text-danger" role="alert" data-field-errors>{{ field.errors }}</div>{% endif %}
+</div>

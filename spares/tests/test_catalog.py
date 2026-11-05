@@ -84,8 +84,7 @@ class CatalogTests(TestCase):
         self.assertEqual(stock.warehouse_id, warehouse.pk)
         self.assertEqual(stock.actual_balance, 6)
         self.assertEqual(stock.input_quantity, 0)
-        self.assertEqual(stock.inventory, Decimal('4.25'))
-        self.assertTrue(stock.discrepancy)
+        self.assertIsNone(stock.inventory)
         opening, correction = StockAdjustment.objects.order_by('pk')
         self.assertEqual((opening.before, opening.after), (0, 4))
         self.assertEqual((correction.before, correction.after), (4, 6))
@@ -131,11 +130,11 @@ class CatalogTests(TestCase):
         stock.refresh_from_db()
         self.assertEqual(stock.actual_balance, 10)
         self.assertRedirects(
-            self.client.post(edit_url, {'actual_balance': '10', 'inventory': '9.75', 'revision': revision}),
+            self.client.post(edit_url, {'actual_balance': '10', 'plan': 'План закупки', 'revision': revision}),
             reverse('spares:stock_report'),
         )
         stock.refresh_from_db()
-        self.assertEqual(stock.inventory, Decimal('9.75'))
+        self.assertEqual(stock.plan, 'План закупки')
         self.assertFalse(StockAdjustment.objects.exists())
 
     def test_admin_stock_edit_is_audited(self):

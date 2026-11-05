@@ -1,23 +1,12 @@
 from re import escape
 
-from django import forms
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.db.models import Q
 from django.utils.functional import cached_property
 from django.views.generic import ListView
 
-from .forms import JournalFilterForm
+from .forms import StockJournalFilterForm
 from .models import StockAdjustment
-
-
-class AdjustmentFilterForm(JournalFilterForm):
-    stock = forms.IntegerField(
-        label='Позиция',
-        required=False,
-        min_value=1,
-        max_value=2**63 - 1,
-        widget=forms.HiddenInput,
-    )
 
 
 class StockAdjustmentListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
@@ -29,7 +18,7 @@ class StockAdjustmentListView(LoginRequiredMixin, PermissionRequiredMixin, ListV
 
     @cached_property
     def filters(self):
-        form = AdjustmentFilterForm(self.request.GET or None)
+        form = StockJournalFilterForm(self.request.GET or None)
         form.fields['q'].widget.attrs['placeholder'] = 'Запчасть, склад, автор или причина'
         return form
 

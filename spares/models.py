@@ -1,14 +1,15 @@
 """Модели приложения Spares."""
-from datetime import date
 from decimal import Decimal, ROUND_HALF_UP
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import models, router, transaction
+from django.utils import timezone
 
 from spares.mixins import NameMixin, CompanyMixin, SpareMixin, MeasureMixin, WarehouseMixin, \
     MachinesWorkersTrailersMixin, PriceMixin
+from spares.validators import validate_posting_date
 
 
 class MeasureMeasurement(NameMixin):
@@ -23,8 +24,22 @@ class MeasureMeasurement(NameMixin):
 
 class Spares(NameMixin):
     """Модель запчастей."""
+    sku = models.CharField(max_length=64, blank=True, null=True, unique=True, verbose_name='Артикул')
+
     def __str__(self):
-        return self.name
+        return f'{self.name} · {self.sku}' if self.sku else self.name
+
+    @staticmethod
+    def normalize_sku(value):
+        return (value or '').strip().upper() or None
+
+    def clean_fields(self, exclude=None):
+        self.sku = self.normalize_sku(self.sku)
+        super().clean_fields(exclude=exclude)
+
+    def save(self, *args, **kwargs):
+        self.sku = self._meta.get_field('sku').clean(self.normalize_sku(self.sku), self)
+        super().save(*args, **kwargs)
 
     class Meta:
         verbose_name_plural = 'Запчасти'
@@ -108,6 +123,14 @@ class MachineWorker(MachinesWorkersTrailersMixin):
 
 
 class StockOperation(CompanyMixin, SpareMixin, MeasureMixin, WarehouseMixin, PriceMixin):
+    cancelled_at = models.DateTimeField(null=True, blank=True, editable=False, verbose_name='Дата отмены')
+    cancelled_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, editable=False, on_delete=models.SET_NULL,
+        related_name='cancelled_%(class)ss', verbose_name='Кто отменил',
+    )
+    cancelled_by_name = models.CharField(max_length=150, blank=True, editable=False, verbose_name='Автор отмены')
+    cancellation_reason = models.CharField(max_length=500, blank=True, editable=False, verbose_name='Причина отмены')
+
     class Meta:
         abstract = True
 
@@ -156,6 +179,18 @@ class StockOperation(CompanyMixin, SpareMixin, MeasureMixin, WarehouseMixin, Pri
         using = using or router.db_for_write(type(self), instance=self)
         with transaction.atomic(using=using):
             previous = self._stored(using, lock=True)
+            if self.cancelled_at is not None or (previous is not None and previous.cancelled_at is not None):
+                raise ValidationError('Отменённый документ нельзя изменить.')
+            if previous is None or (
+                (update_fields is None or 'date' in update_fields) and self.date != previous.date
+            ):
+                self.date = self._meta.get_field('date').clean(self.date, self)
+            if previous is None and isinstance(self, Receipt) and self.invoice_id is None and self.invoice_number:
+                if ReceiptInvoice.objects.using(using).filter(
+                    company_id=self.company_id, contractor_id=self.contractor_id, cancelled_at__isnull=True,
+                    number_key=ReceiptInvoice.normalize_number(self.invoice_number),
+                ).exists():
+                    raise ValidationError('Такая накладная уже проведена. Откройте её в журнале накладных.')
             values = {}
             for field in ('price', 'quantity'):
                 if previous is None or update_fields is None or field in update_fields:
@@ -183,12 +218,36 @@ class StockOperation(CompanyMixin, SpareMixin, MeasureMixin, WarehouseMixin, Pri
                     to_warehouse_id=current.warehouse_id,
                 )
 
+    def cancel(self, *, actor, reason, allow_invoice=False):
+        reason = (reason or '').strip()
+        if not reason:
+            raise ValidationError('Укажите причину отмены.')
+        reason = self._meta.get_field('cancellation_reason').clean(reason, self)
+        if not getattr(actor, 'is_authenticated', False) or actor.pk is None:
+            raise ValidationError('Для отмены нужен автор.')
+
+        using = router.db_for_write(type(self), instance=self)
+        with transaction.atomic(using=using):
+            previous = self._stored(using, lock=True)
+            if previous is None or previous.cancelled_at is not None:
+                raise ValidationError('Документ уже отменён или отсутствует.')
+            if getattr(previous, 'invoice_id', None) is not None and not allow_invoice:
+                raise ValidationError('Откройте накладную, чтобы отменить все её позиции.')
+            Stock.adjust(previous, -previous.quantity, using, persist=True)
+            cancellation = {
+                'cancelled_at': timezone.now(), 'cancelled_by_id': actor.pk,
+                'cancelled_by_name': actor.get_username(), 'cancellation_reason': reason,
+            }
+            type(self).objects.using(using).filter(pk=previous.pk).update(**cancellation)
+            for field, value in cancellation.items():
+                setattr(self, field, value)
+
 
 class Receipt(StockOperation):
     """Модель таблицы прихода."""
     stock_field = 'input_quantity'
     total_field = 'amount'
-    date = models.DateField(verbose_name='Дата', default=date.today)
+    date = models.DateField(verbose_name='Дата', default=timezone.localdate, validators=[validate_posting_date])
     quantity = models.DecimalField(
         verbose_name='Количество', max_digits=15, decimal_places=2,
         validators=[MinValueValidator(Decimal('0.01'))],
@@ -196,6 +255,10 @@ class Receipt(StockOperation):
     amount = models.DecimalField(verbose_name='Итого', max_digits=15, decimal_places=2)
     invoice_number = models.CharField(max_length=255, verbose_name='Номер накладной')
     contractor = models.ForeignKey(Contractors, on_delete=models.PROTECT, verbose_name='Контрагент')
+    invoice = models.ForeignKey(
+        'spares.ReceiptInvoice', null=True, blank=True, on_delete=models.PROTECT,
+        related_name='lines', verbose_name='Многострочная накладная',
+    )
 
     class Meta:
         verbose_name_plural = 'Приход'
@@ -216,6 +279,10 @@ class Stock(CompanyMixin, SpareMixin, MeasureMixin, WarehouseMixin, PriceMixin):
     inventory = models.DecimalField(
         blank=True, null=True, max_digits=15, decimal_places=2, verbose_name='По инвентаризации',
         validators=[MinValueValidator(Decimal('0.00'))],
+    )
+    inventory_book_balance = models.DecimalField(
+        blank=True, null=True, max_digits=15, decimal_places=2, editable=False,
+        verbose_name='Учётный остаток на момент пересчёта',
     )
 
     @classmethod
@@ -291,12 +358,15 @@ class Stock(CompanyMixin, SpareMixin, MeasureMixin, WarehouseMixin, PriceMixin):
             previous = Stock.objects.using(using).select_for_update().filter(pk=self.pk).first()
             self._validate_key(previous, using, update_fields)
             if update_fields is None or previous is None:
-                balance, inventory = self.actual_balance, self.inventory
+                balance, inventory, book = self.actual_balance, self.inventory, self.inventory_book_balance
             else:
                 balance = self.actual_balance if 'actual_balance' in update_fields else previous.actual_balance
                 inventory = self.inventory if 'inventory' in update_fields else previous.inventory
+                book = self.inventory_book_balance if 'inventory_book_balance' in update_fields else previous.inventory_book_balance
                 update_fields.add('discrepancy')
-            self.discrepancy = inventory is not None and Decimal(inventory) != Decimal(balance)
+            self.discrepancy = inventory is not None and Decimal(inventory) != Decimal(
+                balance if book is None else book,
+            )
             super().save(
                 force_insert=force_insert, force_update=force_update, using=using, update_fields=update_fields,
             )
@@ -345,9 +415,37 @@ class StockAdjustment(models.Model):
         verbose_name_plural = 'Ручные корректировки'
 
 
+class InventoryCount(models.Model):
+    stock = models.ForeignKey(
+        Stock, on_delete=models.SET_NULL, null=True, related_name='counts', verbose_name='Остаток',
+    )
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, verbose_name='Кто пересчитал',
+    )
+    stock_label = models.TextField(verbose_name='Позиция на момент пересчёта')
+    actor_name = models.CharField(max_length=150, verbose_name='Имя пользователя на момент пересчёта')
+    book_quantity = models.DecimalField(max_digits=15, decimal_places=2, verbose_name='По учёту')
+    counted_quantity = models.DecimalField(
+        max_digits=15, decimal_places=2, validators=[MinValueValidator(Decimal('0.00'))],
+        verbose_name='Фактически',
+    )
+    note = models.CharField(max_length=500, blank=True, verbose_name='Примечание')
+    counted_at = models.DateTimeField(auto_now_add=True, verbose_name='Время пересчёта')
+
+    @property
+    def difference(self):
+        return self.counted_quantity - self.book_quantity
+
+    class Meta:
+        default_permissions = ('add', 'view')
+        ordering = ('-counted_at', '-pk')
+        verbose_name = 'Пересчёт остатков'
+        verbose_name_plural = 'Пересчёты остатков'
+
+
 class WriteOff(MachinesWorkersTrailersMixin, StockOperation):
     """Модель таблицы списания."""
-    date = models.DateField(verbose_name='Дата списания')
+    date = models.DateField(verbose_name='Дата списания', validators=[validate_posting_date])
     stock_field = 'output_quantity'
     total_field = 'total_amount'
     quantity = models.DecimalField(
@@ -386,3 +484,8 @@ class Movement(SpareMixin):
     class Meta:
         verbose_name_plural = 'Перемещения'
         verbose_name = 'Перемещение'
+
+
+from .invoice_models import ReceiptInvoice
+from .threshold_models import StockMinimum
+from .transfer_models import StockTransfer

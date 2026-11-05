@@ -25,7 +25,7 @@
               {% endif %}
               {% if perms.spares.view_receipt %}
                 <li class="nav-item">
-                  <a class="nav-link{% if section == 'operations' and 'receipt' in route %} active{% endif %}"
+                  <a class="nav-link{% if section == 'invoices' or section == 'operations' and 'receipt' in route %} active{% endif %}"
                      href="{% url 'operations:receipts' %}" {% if route == 'receipts' %}aria-current="page"{% endif %}>Приход</a>
                 </li>
               {% endif %}
@@ -36,11 +36,19 @@
                 </li>
               {% endif %}
               <li class="nav-item dropdown">
-                <button class="nav-link dropdown-toggle{% if section == 'catalog' and route != 'stock-edit' and route != 'stock-add' or route == 'movements' or 'report' in route and route != 'stock_report' %} active{% endif %}"
+                <button class="nav-link dropdown-toggle{% if section == 'inventory' or section == 'transfers' or section == 'catalog' and route != 'stock-edit' and route != 'stock-add' or route == 'movements' or 'report' in route and route != 'stock_report' %} active{% endif %}"
                         type="button" data-bs-toggle="dropdown" aria-expanded="false">Ещё</button>
                 <ul class="dropdown-menu">
                   <li><a class="dropdown-item" href="{% url 'catalog:index' %}">Справочники</a></li>
-                  {% if perms.spares.view_movement %}
+                  {% if perms.spares.view_stockminimum %}
+                    <li><a class="dropdown-item" href="{% url 'catalog:minimums' %}">Минимальные остатки</a></li>
+                  {% endif %}
+                  {% if perms.spares.view_inventorycount %}
+                    <li><a class="dropdown-item" href="{% url 'inventory:list' %}">Инвентаризация</a></li>
+                  {% endif %}
+                  {% if perms.spares.view_stocktransfer %}
+                    <li><a class="dropdown-item" href="{% url 'transfers:list' %}">Перемещения</a></li>
+                  {% elif perms.spares.view_movement %}
                     <li><a class="dropdown-item" href="{% url 'operations:movements' %}">Перемещения</a></li>
                   {% endif %}
                   {% if perms.spares.view_stockadjustment %}

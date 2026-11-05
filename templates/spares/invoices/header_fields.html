@@ -1,0 +1,6 @@
+{% if form.non_field_errors %}<div class="alert alert-danger" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+<div class="operation-fields">
+  {% for field in form.visible_fields %}
+    {% if field.name != 'workbook' %}{% include 'spares/invoices/field.html' %}{% endif %}
+  {% endfor %}
+</div>
