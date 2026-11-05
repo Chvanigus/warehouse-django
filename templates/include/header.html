@@ -1,30 +1,47 @@
-<nav class="navbar navbar-expand-lg navbar-light bg-light">
-  <a class="navbar-brand" href="{% url 'spares:warehouse_main' %}">Сайт учёта запчастей</a>
-  <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav"
-          aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-    <span class="navbar-toggler-icon"></span>
-  </button>
-  <div class="collapse navbar-collapse" id="navbarNav">
-    <ul class="navbar-nav">
-      <li class="nav-item active">
-        <a class="nav-link" href="{% url 'admin:index' %}">Админ.панель</a>
-      </li>
-      <li class="nav-item">
-        <a class="nav-link" href="{% url 'spares:stock_report' %}">Отчёт по остаткам</a>
-      </li>
-      <li class="nav-item">
-        <a class="nav-link" href="{% url 'spares:income_outcome_report' %}">Приход/Расход</a>
-      </li>
-      <li class="nav-item">
-        <a class="nav-link" href="{% url 'spares:machine_report' %}">Отчёт по технике</a>
-      </li>
-      <li class="nav-item">
-        <a class="nav-link" href="{% url 'spares:trailer_report' %}">Отчёт по прицепам</a>
-      </li>
-      <li class="nav-item">
-        <a class="nav-link" href="{% url 'spares:contractor_report' %}">Отчёт по контрагентам</a>
-      </li>
-    </ul>
-  </div>
-</nav>
-
+<header class="border-bottom bg-light">
+  <nav class="navbar navbar-expand-lg" aria-label="Главное меню">
+    <div class="container">
+      <a class="navbar-brand" href="{% url 'spares:warehouse_main' %}">Складской учёт</a>
+      {% if user.is_authenticated %}
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#warehouse-nav"
+                aria-controls="warehouse-nav" aria-expanded="false" aria-label="Открыть меню">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="warehouse-nav">
+          <ul class="navbar-nav me-auto">
+            {% if perms.spares.view_receipt or perms.spares.view_writeoff or perms.spares.view_movement %}
+              <li class="nav-item dropdown">
+                <button class="nav-link dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">Операции</button>
+                <ul class="dropdown-menu">
+                  {% if perms.spares.view_receipt %}<li><a class="dropdown-item" href="{% url 'operations:receipts' %}">Приход</a></li>{% endif %}
+                  {% if perms.spares.view_writeoff %}<li><a class="dropdown-item" href="{% url 'operations:writeoffs' %}">Списания</a></li>{% endif %}
+                  {% if perms.spares.view_movement %}<li><a class="dropdown-item" href="{% url 'operations:movements' %}">Перемещения</a></li>{% endif %}
+                </ul>
+              </li>
+            {% endif %}
+            <li class="nav-item"><a class="nav-link" href="{% url 'catalog:index' %}">Справочники</a></li>
+            {% if perms.spares.view_stock or perms.spares.view_receipt or perms.spares.view_writeoff %}
+              <li class="nav-item dropdown">
+                <button class="nav-link dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">Отчёты</button>
+                <ul class="dropdown-menu">
+                  {% if perms.spares.view_stock %}<li><a class="dropdown-item" href="{% url 'spares:stock_report' %}">Остатки</a></li>{% endif %}
+                  {% if perms.spares.view_receipt and perms.spares.view_writeoff %}<li><a class="dropdown-item" href="{% url 'spares:income_outcome_report' %}">Приход и расход</a></li>{% endif %}
+                  {% if perms.spares.view_writeoff %}
+                    <li><a class="dropdown-item" href="{% url 'spares:machine_report' %}">Техника</a></li>
+                    <li><a class="dropdown-item" href="{% url 'spares:trailer_report' %}">Прицепы</a></li>
+                  {% endif %}
+                  {% if perms.spares.view_receipt %}<li><a class="dropdown-item" href="{% url 'spares:contractor_report' %}">Контрагенты</a></li>{% endif %}
+                </ul>
+              </li>
+            {% endif %}
+          </ul>
+          <span class="navbar-text me-3">{{ user.get_username }}</span>
+          <form method="post" action="{% url 'spares:logout' %}" class="d-inline-block">
+            {% csrf_token %}
+            <button class="btn btn-outline-secondary btn-sm" type="submit">Выйти</button>
+          </form>
+        </div>
+      {% endif %}
+    </div>
+  </nav>
+</header>

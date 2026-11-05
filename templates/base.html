@@ -1,47 +1,25 @@
 {% load static %}
-
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ru">
-
 <head>
-  <meta charset="UTF-8">
-  <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{% block title %}{% endblock title %}</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Складской учёт{% endblock %}</title>
+  <link rel="icon" href="{% static 'images/warehouse.svg' %}">
   <link rel="stylesheet" href="{% static 'libs/bootstrap/css/bootstrap.min.css' %}">
-  <!-- Extra CSS -->
-  {% block extra_css %}{% endblock extra_css %}
+  {% block extra_css %}{% endblock %}
 </head>
-
 <body>
-<!-- Предзагрузочная страница -->
-{% block preloader %}
-  {% include 'include/preloader.html' %}
-{% endblock preloader %}
-<!-- Конец предзагрузочкой страницы -->
-
-<!-- Header -->
-<header>
   {% include 'include/header.html' %}
-</header>
-<!-- Конец header -->
-
-
-{% block content %}{% endblock content %}
-
-<!-- Footer -->
-{% block footer %}
-  {% include 'include/footer.html' %}
-{% endblock footer %}
-<!-- Конец footer -->
-
-
-<!-- JAVASCRIPT -->
-<script src="{% static 'libs/jquery/jquery.min.js' %}"></script>
-<script src="{% static 'libs/jquery-ui-dist/jquery-ui.min.js' %}"></script>
-<script src="{% static 'libs/bootstrap/js/bootstrap.min.js' %}"></script>
-
-<!-- Extra Javascript -->
-{% block extra_javascript %}{% endblock extra_javascript %}
+  {% if messages %}
+    <div class="container pt-3">
+      {% for message in messages %}
+        <div class="alert {% if message.level == DEFAULT_MESSAGE_LEVELS.ERROR %}alert-danger{% else %}alert-{{ message.tags|default:'info' }}{% endif %}" role="status">{{ message }}</div>
+      {% endfor %}
+    </div>
+  {% endif %}
+  {% block content %}{% endblock %}
+  <script src="{% static 'libs/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
+  {% block extra_javascript %}{% endblock %}
 </body>
 </html>

@@ -1,0 +1,37 @@
+{% extends 'spares/filtered_report.html' %}
+
+{% block report_table %}
+  <table class="table table-striped report-datatable">
+    <thead>
+      <tr>
+        <th scope="col">{% if vehicle_field == 'machine' %}Техника{% else %}Прицеп{% endif %}</th>
+        <th scope="col">Водитель</th>
+        <th scope="col">Наименование</th>
+        <th scope="col">Мера</th>
+        <th scope="col">Фирма</th>
+        <th scope="col">Дата списания</th>
+        <th scope="col">Склад</th>
+        <th scope="col">Списанное количество</th>
+        <th scope="col">Цена</th>
+        <th scope="col">Итого</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for entry in report_data %}
+        <tr>
+          <td>{% if vehicle_field == 'machine' %}{{ entry.machine }}{% else %}{{ entry.trailer }}{% endif %}</td>
+          <td>{{ entry.worker }}</td>
+          <td>{{ entry.spare }}</td>
+          <td>{{ entry.measure|default_if_none:'—' }}</td>
+          <td>{{ entry.company }}</td>
+          <td data-order="{{ entry.date|date:'Y-m-d' }}">{{ entry.date|date:'d.m.Y' }}</td>
+          <td>{{ entry.warehouse }}</td>
+          <td>{{ entry.quantity|floatformat:'2u' }}</td>
+          <td>{{ entry.price|floatformat:'2u' }}</td>
+          <td>{{ entry.total_amount|floatformat:'2u' }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if not report_data %}<noscript><p>За выбранный период списаний нет.</p></noscript>{% endif %}
+{% endblock %}

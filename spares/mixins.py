@@ -1,5 +1,6 @@
 """Миксины приложения spares."""
 
+from django.core.validators import MinValueValidator
 from django.db import models
 
 
@@ -11,7 +12,7 @@ class NameMixin(models.Model):
 
 
 class CompanyMixin(models.Model):
-    company = models.ForeignKey('spares.Company', on_delete=models.CASCADE, verbose_name='Фирма')
+    company = models.ForeignKey('spares.Company', on_delete=models.PROTECT, verbose_name='Фирма')
 
     class Meta:
         abstract = True
@@ -20,7 +21,7 @@ class CompanyMixin(models.Model):
 class SpareMixin(models.Model):
     spare = models.ForeignKey(
         'spares.Spares',
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         verbose_name='Наименование'
     )
 
@@ -31,7 +32,7 @@ class SpareMixin(models.Model):
 class MeasureMixin(models.Model):
     measure = models.ForeignKey(
         'spares.MeasureMeasurement',
-        on_delete=models.DO_NOTHING,
+        on_delete=models.PROTECT,
         verbose_name='Мера',
         null=True,
         blank=True
@@ -42,7 +43,7 @@ class MeasureMixin(models.Model):
 
 
 class WarehouseMixin(models.Model):
-    warehouse = models.ForeignKey('spares.Warehouses', on_delete=models.CASCADE, verbose_name='Склад')
+    warehouse = models.ForeignKey('spares.Warehouses', on_delete=models.PROTECT, verbose_name='Склад')
 
     class Meta:
         abstract = True
@@ -51,19 +52,19 @@ class WarehouseMixin(models.Model):
 class MachinesWorkersTrailersMixin(models.Model):
     machine = models.ForeignKey(
         'spares.Machines',
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         verbose_name='Техника',
         null=True,
         blank=True
     )
     worker = models.ForeignKey(
         'spares.Workers',
-        on_delete=models.DO_NOTHING,
+        on_delete=models.PROTECT,
         verbose_name='Работник'
     )
     trailer = models.ForeignKey(
         'spares.Trailers',
-        on_delete=models.DO_NOTHING,
+        on_delete=models.PROTECT,
         verbose_name='Прицепное',
         null=True,
         blank=True
@@ -74,7 +75,10 @@ class MachinesWorkersTrailersMixin(models.Model):
 
 
 class PriceMixin(models.Model):
-    price = models.DecimalField(verbose_name='Цена', default=0, max_digits=15, decimal_places=2)
+    price = models.DecimalField(
+        verbose_name='Цена', default=0, max_digits=15, decimal_places=2,
+        validators=[MinValueValidator(0)],
+    )
 
     class Meta:
         abstract = True

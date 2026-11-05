@@ -1,104 +1,11 @@
-{% extends 'base.html' %}
-{% load user_filters %}
-{% load static %}
+{% extends 'spares/report_base.html' %}
 
-{% block title %}Приход/Расход{% endblock title %}
-
-{% block extra_css %}
-  <link rel="stylesheet" href="{% static 'libs/datatables.net-bs4/css/dataTables.bootstrap4.min.css' %}">
-  <link rel="stylesheet" href="{% static 'libs/datatables.net-buttons-bs4/css/buttons.bootstrap4.min.css' %}">
-  <link rel="stylesheet" href="{% static 'libs/datatables.net-select-bs4/css/select.bootstrap4.min.css' %}">
-  <link rel="stylesheet" href="{% static 'libs/datatables.net-responsive-bs4/css/responsive.bootstrap4.min.css' %}">
-{% endblock extra_css %}
+{% block title %}Отчёт по приходу и расходу{% endblock %}
 
 {% block content %}
-  <div class="container py-5">
-    <div class="card mb-3">
-      <div class="card-body">
-        <h4 class="card-title">Отчёт по приходу</h4>
-        <hr>
-        <div class="table-responsive">
-          <table class="table table-striped income-outcome-report-table">
-            <thead>
-            <tr>
-              <th>Фирма</th>
-              <th>Итого</th>
-              {% for month in months %}
-                <th>{{ month }}</th>
-              {% endfor %}
-              <th>Год</th>
-            </tr>
-            </thead>
-            <tbody>
-            {% for data in income_report %}
-              <tr>
-                <td>{{ data.company }}</td>
-                <td>{{ data.year_total|round_float|to_str }}</td>
-                {% for month in months %}
-                  <td>{% if data.month_totals|get_item:forloop.counter %}
-                    {{ data.month_totals|get_item:forloop.counter|round_float|to_str }}{% else %}0{% endif %}</td>
-                {% endfor %}
-                <td>{{ data.year }}</td>
-              </tr>
-            {% endfor %}
-            </tbody>
-          </table>
-        </div>
-        <hr>
-        <h4 class="card-title">Отчёт по расходу</h4>
-        <hr>
-        <div class="table-responsive">
-          <table class="table table-striped income-outcome-report-table">
-            <thead>
-            <tr>
-              <th>Фирма</th>
-              <th>Итого</th>
-              {% for month in months %}
-                <th>{{ month }}</th>
-              {% endfor %}
-              <th>Год</th>
-            </tr>
-            </thead>
-            <tbody>
-            {% for data in outcome_report %}
-              <tr>
-                <td>{{ data.company }}</td>
-                <td>{{ data.year_total|round_float|to_str }}</td>
-                {% for month in months %}
-                  <td>{% if data.month_totals|get_item:forloop.counter %}
-                    {{ data.month_totals|get_item:forloop.counter|round_float|to_str }}{% else %}0{% endif %}</td>
-                {% endfor %}
-                <td>{{ data.year }}</td>
-              </tr>
-            {% endfor %}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  </div>
+  <main class="container-fluid px-4 py-4">
+    <h1 class="h2 mb-3">Приход и расход</h1>
+    {% include 'spares/monthly_totals.html' with heading='Приход' report=income_report %}
+    {% include 'spares/monthly_totals.html' with heading='Расход' report=outcome_report %}
+  </main>
 {% endblock %}
-
-{% block extra_javascript %}
-
-  <!-- Datatables -->
-  <script src="{% static 'libs/datatables.net/js/jquery.dataTables.min.js' %}"></script>
-  <script src="{% static 'libs/datatables.net-bs4/js/dataTables.bootstrap4.min.js' %}"></script>
-  <script src="{% static 'libs/datatables.net-bs4/js/dataTables.rowGroup.min.js' %}"></script>
-  <script src="{% static 'libs/datatables.net-buttons/js/dataTables.buttons.min.js' %}"></script>
-  <script src="{% static 'libs/datatables.net-buttons-bs4/js/buttons.bootstrap4.min.js' %}"></script>
-  <script src="{% static 'libs/jszip/jszip.min.js' %}"></script>
-  <script src="{% static 'libs/datatables.net-buttons/js/buttons.html5.min.js' %}"></script>
-  <script src="{% static 'libs/datatables.net-buttons/js/buttons.print.min.js' %}"></script>
-  <script src="{% static 'libs/datatables.net-buttons/js/buttons.colVis.min.js' %}"></script>
-  <script src="{% static 'libs/datatables.net-responsive/js/dataTables.responsive.min.js' %}"></script>
-  <script src="{% static 'libs/datatables.net-responsive-bs4/js/responsive.bootstrap4.min.js' %}"></script>
-  <script src="{% static 'libs/datatables.net-keytable/js/dataTables.keyTable.min.js' %}"></script>
-  <script src="{% static 'libs/datatables.net-select/js/dataTables.select.min.js' %}"></script>
-
-  <!-- Инициализация Datatables -->
-  <script id="json_url" src="{% static 'js/pages/income-outcome-report-datatable.init.js' %}"
-          data-json-url="{% static 'json/russian_datatable.json' %}">
-  </script>
-
-{% endblock extra_javascript %}

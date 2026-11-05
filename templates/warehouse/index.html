@@ -1,1 +1,50 @@
 {% extends 'base.html' %}
+
+{% block content %}
+  <main class="container py-4">
+    <h1 class="h2 mb-4">Складской учёт</h1>
+    <div class="row row-cols-1 row-cols-lg-3 g-3">
+      {% if perms.spares.view_receipt or perms.spares.view_writeoff or perms.spares.view_movement %}
+        <section class="col">
+          <div class="card h-100">
+            <div class="card-body">
+              <h2 class="h5">Операции</h2>
+              <div class="list-group list-group-flush">
+                {% if perms.spares.view_receipt %}<a class="list-group-item list-group-item-action" href="{% url 'operations:receipts' %}">Приход</a>{% endif %}
+                {% if perms.spares.view_writeoff %}<a class="list-group-item list-group-item-action" href="{% url 'operations:writeoffs' %}">Списания</a>{% endif %}
+                {% if perms.spares.view_movement %}<a class="list-group-item list-group-item-action" href="{% url 'operations:movements' %}">Перемещения</a>{% endif %}
+              </div>
+            </div>
+          </div>
+        </section>
+      {% endif %}
+      {% if perms.spares.view_stock or perms.spares.view_receipt or perms.spares.view_writeoff %}
+        <section class="col">
+          <div class="card h-100">
+            <div class="card-body">
+              <h2 class="h5">Отчёты</h2>
+              <div class="list-group list-group-flush">
+                {% if perms.spares.view_stock %}<a class="list-group-item list-group-item-action" href="{% url 'spares:stock_report' %}">Остатки</a>{% endif %}
+                {% if perms.spares.view_receipt and perms.spares.view_writeoff %}<a class="list-group-item list-group-item-action" href="{% url 'spares:income_outcome_report' %}">Приход и расход</a>{% endif %}
+                {% if perms.spares.view_writeoff %}
+                  <a class="list-group-item list-group-item-action" href="{% url 'spares:machine_report' %}">По технике</a>
+                  <a class="list-group-item list-group-item-action" href="{% url 'spares:trailer_report' %}">По прицепам</a>
+                {% endif %}
+                {% if perms.spares.view_receipt %}<a class="list-group-item list-group-item-action" href="{% url 'spares:contractor_report' %}">По контрагентам</a>{% endif %}
+              </div>
+            </div>
+          </div>
+        </section>
+      {% endif %}
+      <section class="col">
+        <div class="card h-100">
+          <div class="card-body">
+            <h2 class="h5">Справочники</h2>
+            <p>Запчасти, склады, фирмы, сотрудники и техника.</p>
+            <a class="btn btn-outline-primary" href="{% url 'catalog:index' %}">Открыть справочники</a>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+{% endblock %}

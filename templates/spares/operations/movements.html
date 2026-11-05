@@ -1,0 +1,19 @@
+{% extends 'spares/operations/list.html' %}
+
+{% block description %}
+  <p>Здесь отображаются перемещения, созданные при изменении склада в записи о приходе.</p>
+{% endblock %}
+
+{% block headings %}
+  <th scope="col">Дата и время</th>
+  <th scope="col">Запчасть</th>
+  <th scope="col">Склад-отправитель</th>
+  <th scope="col">Склад-получатель</th>
+{% endblock %}
+
+{% block cells %}
+  <td>{{ entry.timestamp|date:"d.m.Y H:i" }}</td>
+  <td>{{ entry.spare }}</td>
+  <td>{{ entry.from_warehouse }}</td>
+  <td>{{ entry.to_warehouse }}</td>
+{% endblock %}

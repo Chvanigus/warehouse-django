@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% load user_filters %}
+
+{% block title %}Вход в складской учёт{% endblock %}
+
+{% block content %}
+  <main class="container py-5">
+    <div class="row justify-content-center">
+      <section class="col-sm-9 col-md-7 col-lg-5">
+        <div class="card">
+          <div class="card-body p-4">
+            <h1 class="h4 mb-4">Вход в складской учёт</h1>
+            <form method="post">
+              {% csrf_token %}
+              {{ form.non_field_errors }}
+              {% for field in form %}
+                <div class="mb-3">
+                  <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                  {{ field|addclass:'form-control' }}
+                  {{ field.errors }}
+                </div>
+              {% endfor %}
+              <input type="hidden" name="next" value="{{ next }}">
+              <button class="btn btn-primary w-100" type="submit">Войти</button>
+            </form>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+{% endblock %}

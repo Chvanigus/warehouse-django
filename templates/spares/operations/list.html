@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ list_title }}{% endblock %}
+
+{% block content %}
+  <main class="container py-4">
+    <div class="d-flex flex-wrap align-items-center gap-3 mb-3">
+      <h1 class="mb-0">{{ list_title }}</h1>
+      {% if add_url %}<a class="btn btn-primary" href="{{ add_url }}">Добавить запись</a>{% endif %}
+    </div>
+    {% block description %}{% endblock %}
+    <form method="get" class="d-flex flex-wrap align-items-end gap-2 mb-3" role="search">
+      <div>
+        <label for="operation-search" class="form-label">Поиск записей</label>
+        <input type="search" name="q" id="operation-search" class="form-control" value="{{ search }}" maxlength="100">
+      </div>
+      <button type="submit" class="btn btn-outline-primary">Найти</button>
+      {% if search %}<a href="{{ list_url }}" class="btn btn-outline-secondary">Сбросить</a>{% endif %}
+    </form>
+    {% if entries %}
+      <div class="table-responsive">
+        <table class="table table-striped align-middle">
+          <thead><tr>{% block headings %}{% endblock %}</tr></thead>
+          <tbody>
+            {% for entry in entries %}
+              <tr>{% block cells %}{% endblock %}</tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if is_paginated %}
+        <nav class="d-flex gap-3 align-items-center" aria-label="Страницы записей">
+          {% if page_obj.has_previous %}
+            <a href="{% querystring page=page_obj.previous_page_number %}">Назад</a>
+          {% endif %}
+          <span>Страница {{ page_obj.number }} из {{ paginator.num_pages }}</span>
+          {% if page_obj.has_next %}
+            <a href="{% querystring page=page_obj.next_page_number %}">Далее</a>
+          {% endif %}
+        </nav>
+      {% endif %}
+    {% else %}
+      <p>Записи не найдены.</p>
+    {% endif %}
+  </main>
+{% endblock %}

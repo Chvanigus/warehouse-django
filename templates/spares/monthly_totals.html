@@ -1,0 +1,26 @@
+<section class="card card-body mb-3">
+  <h2 class="h5">{{ heading }}</h2>
+  <div class="table-responsive">
+    <table class="table table-striped report-datatable" data-export-title="{{ heading }}">
+      <thead>
+        <tr>
+          <th scope="col">Фирма</th>
+          <th scope="col">Итого</th>
+          {% for month in months %}<th scope="col">{{ month }}</th>{% endfor %}
+          <th scope="col">Год</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for entry in report %}
+          <tr>
+            <td>{{ entry.company }}</td>
+            <td>{{ entry.year_total|floatformat:'2u' }}</td>
+            {% for amount in entry.month_totals %}<td>{{ amount|floatformat:'2u' }}</td>{% endfor %}
+            <td>{{ entry.year|stringformat:'d' }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% if not report %}<noscript><p>Данных пока нет.</p></noscript>{% endif %}
+  </div>
+</section>

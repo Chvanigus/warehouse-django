@@ -1,7 +1,42 @@
-from django.contrib import admin
-from .forms import WriteOffForm, ReceiptForm
+from django.conf import settings
+from django.contrib import admin, messages
+from django.contrib.admin.actions import delete_selected
+from django.core.exceptions import ValidationError
+from django.db import transaction
+from django.http import HttpResponseRedirect
+from django.utils.translation import gettext_lazy as _
+
+from .forms import ReceiptForm, StockForm, WriteOffForm
 from .models import Spares, Warehouses, Company, Contractors, Workers, Machines, MachineWorker, MeasureMeasurement, \
     Trailers, Receipt, Stock, WriteOff, Movement
+
+
+class StockOperationAdmin(admin.ModelAdmin):
+    actions = ('delete_selected',)
+
+    def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
+        try:
+            return super().changeform_view(request, object_id, form_url, extra_context)
+        except ValidationError as error:
+            return self.show_operation_error(request, error)
+
+    def delete_view(self, request, object_id, extra_context=None):
+        try:
+            return super().delete_view(request, object_id, extra_context)
+        except ValidationError as error:
+            return self.show_operation_error(request, error)
+
+    @admin.action(permissions=['delete'], description=_('Delete selected %(verbose_name_plural)s'))
+    def delete_selected(self, request, queryset):
+        try:
+            with transaction.atomic(using=queryset.db):
+                return delete_selected(self, request, queryset)
+        except ValidationError as error:
+            return self.show_operation_error(request, error)
+
+    def show_operation_error(self, request, error):
+        self.message_user(request, ' '.join(error.messages), level=messages.ERROR)
+        return HttpResponseRedirect(request.get_full_path())
 
 
 @admin.register(Spares)
@@ -44,7 +79,8 @@ class MachinesAdmin(admin.ModelAdmin):
 class MachineWorkerAdmin(admin.ModelAdmin):
     list_display = ('worker', 'machine', 'trailer')
     autocomplete_fields = ('worker', 'machine', 'trailer')
-    search_fields = ('worker', 'machine', 'trailer')
+    search_fields = ('worker__name', 'machine__name', 'trailer__name')
+    list_select_related = ('worker', 'machine', 'trailer')
 
 
 @admin.register(MeasureMeasurement)
@@ -59,7 +95,7 @@ class TrailersAdmin(admin.ModelAdmin):
 
 
 @admin.register(Receipt)
-class ReceiptAdmin(admin.ModelAdmin):
+class ReceiptAdmin(StockOperationAdmin):
     form = ReceiptForm
     list_display = (
         'spare',
@@ -81,10 +117,13 @@ class ReceiptAdmin(admin.ModelAdmin):
     )
     search_fields = ('spare__name',)
     autocomplete_fields = ('spare', 'company', 'contractor', 'warehouse')
+    readonly_fields = ('amount',)
+    list_select_related = ('spare', 'measure', 'company', 'warehouse', 'contractor')
 
 
 @admin.register(Stock)
-class StockAdmin(admin.ModelAdmin):
+class StockAdmin(StockOperationAdmin):
+    form = StockForm
     list_filter = ('warehouse', 'company')
     list_display = (
         'spare',
@@ -104,13 +143,16 @@ class StockAdmin(admin.ModelAdmin):
         'input_quantity',
         'output_quantity',
         'discrepancy',
-        'company'
     )
-    autocomplete_fields = ('spare', 'warehouse')
+    autocomplete_fields = ('spare', 'warehouse', 'company')
+    list_select_related = ('spare', 'measure', 'company', 'warehouse')
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(WriteOff)
-class WriteOffAdmin(admin.ModelAdmin):
+class WriteOffAdmin(StockOperationAdmin):
     form = WriteOffForm
     list_display = (
         'spare',
@@ -132,6 +174,18 @@ class WriteOffAdmin(admin.ModelAdmin):
     )
 
     search_fields = ('spare__name',)
+    readonly_fields = ('total_amount',)
+    list_select_related = ('spare', 'measure', 'company', 'warehouse', 'worker', 'machine', 'trailer')
+
+    class Media:
+        css = {'all': ('admin/css/vendor/select2/select2.min.css',)}
+        js = (
+            'admin/js/vendor/jquery/jquery.js' if settings.DEBUG else 'admin/js/vendor/jquery/jquery.min.js',
+            'admin/js/vendor/select2/select2.full.min.js',
+            'admin/js/vendor/select2/i18n/ru.js',
+            'admin/js/jquery.init.js',
+            'js/pages/warehouse-choice.js',
+        )
 
 
 @admin.register(Movement)
@@ -139,3 +193,13 @@ class MovementAdmin(admin.ModelAdmin):
     list_display = ('spare', 'from_warehouse', 'to_warehouse', 'timestamp')
     search_fields = ('spare__name',)
     list_filter = ('timestamp',)
+    list_select_related = ('spare', 'from_warehouse', 'to_warehouse')
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

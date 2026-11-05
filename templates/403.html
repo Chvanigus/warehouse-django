@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+
+{% block title %}Доступ запрещён{% endblock %}
+
+{% block content %}
+  <main class="container py-5">
+    <h1 class="h2">Доступ запрещён</h1>
+    <p>У вашей учётной записи нет прав на открытие этой страницы.</p>
+    <a class="btn btn-primary" href="{% url 'spares:warehouse_main' %}">Вернуться на главную</a>
+  </main>
+{% endblock %}

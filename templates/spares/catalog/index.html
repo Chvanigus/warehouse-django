@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+{% block title %}Справочники{% endblock %}
+{% block content %}
+  <main class="container py-4">
+    <h1 class="mb-4">Справочники</h1>
+    <div class="list-group">
+      {% for slug, name in catalogs %}
+        <a class="list-group-item list-group-item-action" href="{% url 'catalog:list' slug %}">{{ name|capfirst }}</a>
+      {% empty %}
+        <p>У вас пока нет доступа к справочникам.</p>
+      {% endfor %}
+    </div>
+  </main>
+{% endblock %}

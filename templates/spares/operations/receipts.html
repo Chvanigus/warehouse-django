@@ -1,0 +1,25 @@
+{% extends 'spares/operations/list.html' %}
+
+{% block headings %}
+  <th scope="col">Дата</th>
+  <th scope="col">Запчасть</th>
+  <th scope="col">Склад / фирма</th>
+  <th scope="col">Количество</th>
+  <th scope="col">Цена</th>
+  <th scope="col">Сумма</th>
+  <th scope="col">Накладная</th>
+  <th scope="col">Контрагент</th>
+  {% if can_change or can_delete %}<th scope="col">Действия</th>{% endif %}
+{% endblock %}
+
+{% block cells %}
+  <td>{{ entry.date|date:"d.m.Y" }}</td>
+  <td>{{ entry.spare }}</td>
+  <td>{{ entry.warehouse }} / {{ entry.company }}</td>
+  <td>{{ entry.quantity }} {{ entry.measure|default_if_none:"" }}</td>
+  <td>{{ entry.price }}</td>
+  <td>{{ entry.amount }}</td>
+  <td>{{ entry.invoice_number }}</td>
+  <td>{{ entry.contractor }}</td>
+  {% include 'spares/operations/actions.html' %}
+{% endblock %}

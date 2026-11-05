@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+{% block title %}Удаление записи{% endblock %}
+{% block content %}
+  <main class="container py-4">
+    <p><a href="{{ back_url }}">{{ catalog_name|capfirst }}</a></p>
+    <h1>Удаление записи</h1>
+    <p>Удалить «{{ object }}»?</p>
+    <form method="post">
+      {% csrf_token %}
+      {{ form.non_field_errors }}
+      <button type="submit" class="btn btn-danger">Удалить</button>
+      <a href="{{ back_url }}" class="btn btn-outline-secondary">Отмена</a>
+    </form>
+  </main>
+{% endblock %}

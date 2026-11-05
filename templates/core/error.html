@@ -1,0 +1,18 @@
+{% load static %}
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block error_title %}{% endblock %}</title>
+  <link rel="icon" href="{% static 'images/warehouse.svg' %}">
+  <link rel="stylesheet" href="{% static 'libs/bootstrap/css/bootstrap.min.css' %}">
+</head>
+<body>
+  <main class="container py-5 text-center">
+    <h1 class="h2">{% block heading %}{% endblock %}</h1>
+    <p class="mb-4">{% block description %}{% endblock %}</p>
+    <a class="btn btn-primary" href="{% url 'spares:warehouse_main' %}">Вернуться на главную</a>
+  </main>
+</body>
+</html>

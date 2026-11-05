@@ -1,24 +1,19 @@
-$(document).ready(function () {
-    const scriptElement = document.getElementById('json_url')
-    $('#report-datatable').DataTable({
-        language: {
-            url: scriptElement.getAttribute('data-json-url'),
+const languageUrl = document.currentScript.dataset.languageUrl;
+
+for (const table of document.querySelectorAll('.report-datatable')) {
+    const exportOptions = {columns: ':not(.no-export)', escapeExcelFormula: true};
+
+    new DataTable(table, {
+        language: {url: languageUrl},
+        layout: {
+            topStart: {
+                buttons: [
+                    {extend: 'copyHtml5', text: 'Копировать', exportOptions},
+                    {extend: 'excelHtml5', text: 'Excel', title: table.dataset.exportTitle || document.title, exportOptions},
+                ],
+            },
         },
-        dom: 'Bfrtip',
-        buttons: [
-            'copy', 'excel',
-        ],
-        paging: true,
-        ordering: true,
-        rowGroup: {
-            dataSrc: 0
-        },
-        columnDefs: [
-            {
-                targets: 0,
-                visible: false
-            }
-        ],
-        order: [[1, 'asc']]
+        order: [],
+        columnDefs: [{targets: 'th.no-export', orderable: false, searchable: false}],
     });
-});
+}

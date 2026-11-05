@@ -5,9 +5,9 @@ from spares import urls as spares_urls
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('catalog/', include('spares.catalog_urls')),
+    path('operations/', include('spares.operation_urls')),
     path('', include(spares_urls)),
-    path("__debug__/", include("debug_toolbar.urls")),
-    path("select2/", include("django_select2.urls")),
 ]
 
 # Обработчики ошибок

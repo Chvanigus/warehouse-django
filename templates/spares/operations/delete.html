@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+
+{% block title %}Удаление · {{ list_title }}{% endblock %}
+
+{% block content %}
+  <main class="container py-4">
+    <h1>Удаление записи</h1>
+    <p>Удалить запись №{{ object.pk }} «{{ object }}» за {{ object.date|date:"d.m.Y" }}?</p>
+    <form method="post">
+      {% csrf_token %}
+      {% if form.non_field_errors %}
+        <div class="alert alert-danger" role="alert">{{ form.non_field_errors }}</div>
+      {% endif %}
+      <button type="submit" class="btn btn-danger">Удалить</button>
+      <a href="{{ list_url }}" class="btn btn-outline-secondary">Отмена</a>
+    </form>
+  </main>
+{% endblock %}

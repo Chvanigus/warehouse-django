@@ -1,73 +1,39 @@
-from collections import defaultdict
+from decimal import Decimal
+
+from django.db.models import Sum
+from django.db.models.functions import ExtractMonth, ExtractYear
 
 from spares.models import Receipt, WriteOff
 
 
+ZERO = Decimal('0.00')
+
+
+def _annual_report(model, amount_field):
+    rows = (
+        model.objects.annotate(year=ExtractYear('date'), month=ExtractMonth('date'))
+        .values('company_id', 'company__name', 'year', 'month')
+        .annotate(amount=Sum(amount_field))
+        .order_by('company__name', 'company_id', '-year', 'month')
+    )
+    company_years = {}
+    for row in rows:
+        company_year = (row['company_id'], row['year'])
+        summary = company_years.setdefault(company_year, {
+            'company': row['company__name'],
+            'year': row['year'],
+            'month_totals': [ZERO] * 12,
+            'year_total': ZERO,
+        })
+        amount = row['amount'].quantize(ZERO)
+        summary['month_totals'][row['month'] - 1] = amount
+        summary['year_total'] += amount
+    return list(company_years.values())
+
+
 def get_income_report():
-    result = []
-
-    companies = Receipt.objects.values('company__name').distinct()
-
-    company_data = defaultdict(lambda: {'year_totals': defaultdict(lambda: defaultdict(float))})
-
-    for row in Receipt.objects.all():
-        company_id = row.company.name
-        year = row.date.year
-        month = row.date.month
-        amount = float(row.amount)
-
-        company_data[company_id]['year_totals'][year][month] += round(amount, 2)
-
-    for company in companies:
-        company_id = company['company__name']
-        company_years = company_data[company_id]['year_totals']
-
-        for year, month_totals in company_years.items():
-            month_totals = defaultdict(float, month_totals)
-            company_years[year] = month_totals
-
-        for year, month_totals in company_years.items():
-            company_data_entry = {
-                'company': company_id,
-                'year': year,
-                'year_total': sum(month_totals.values()),
-                'month_totals': dict(month_totals)
-            }
-
-            result.append(company_data_entry)
-
-    return result
+    return _annual_report(Receipt, 'amount')
 
 
 def get_outcome_report():
-    result = []
-    companies = Receipt.objects.values('company__name').distinct()
-    company_data = defaultdict(lambda: {'year_totals': defaultdict(lambda: defaultdict(float))})
-
-    for row in WriteOff.objects.all():
-        company_id = row.company.name
-        year = row.date.year
-        month = row.date.month
-        amount = float(row.total_amount)
-
-        company_data[company_id]['year_totals'][year][month] += round(amount, 2)
-
-    for company in companies:
-        company_id = company['company__name']
-        company_years = company_data[company_id]['year_totals']
-
-        for year, month_totals in company_years.items():
-            month_totals = defaultdict(float, month_totals)
-            company_years[year] = month_totals
-
-        for year, month_totals in company_years.items():
-            company_data_entry = {
-                'company': company_id,
-                'year': year,
-                'year_total': sum(month_totals.values()),
-                'month_totals': dict(month_totals)
-            }
-
-            result.append(company_data_entry)
-
-    return result
+    return _annual_report(WriteOff, 'total_amount')

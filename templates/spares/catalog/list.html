@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% block title %}{{ catalog_name|capfirst }}{% endblock %}
+{% block content %}
+  <main class="container py-4">
+    <p><a href="{% url 'catalog:index' %}">Все справочники</a></p>
+    <h1>{{ catalog_name|capfirst }}</h1>
+    <div class="d-flex flex-wrap gap-2 justify-content-between my-3">
+      <form method="get" class="d-flex gap-2" role="search">
+        <input type="search" class="form-control" name="q" value="{{ query }}" aria-label="Поиск" placeholder="Поиск">
+        <button type="submit" class="btn btn-outline-primary">Найти</button>
+        {% if query %}<a class="btn btn-outline-secondary" href="{{ back_url }}">Сбросить</a>{% endif %}
+      </form>
+      {% if can_add %}
+        <a href="{% url 'catalog:add' slug %}" class="btn btn-primary">Добавить</a>
+      {% endif %}
+    </div>
+    {% if rows %}
+      <div class="table-responsive">
+        <table class="table table-striped align-middle">
+          <thead><tr>
+            {% for column in columns %}<th scope="col">{{ column|capfirst }}</th>{% endfor %}
+            {% if can_change or can_delete %}<th scope="col">Действия</th>{% endif %}
+          </tr></thead>
+          <tbody>
+            {% for pk, values in rows %}
+              <tr>
+                {% for value in values %}<td>{{ value|default_if_none:"—" }}</td>{% endfor %}
+                {% if can_change or can_delete %}
+                  <td class="text-nowrap">
+                    {% if can_change %}
+                      <a class="btn btn-sm btn-outline-primary" href="{% url 'catalog:edit' slug pk %}">Изменить</a>
+                    {% endif %}
+                    {% if can_delete %}
+                      <a class="btn btn-sm btn-outline-danger" href="{% url 'catalog:delete' slug pk %}">Удалить</a>
+                    {% endif %}
+                  </td>
+                {% endif %}
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="text-muted">Записей нет.</p>
+    {% endif %}
+    {% if is_paginated %}
+      <nav class="d-flex gap-3 align-items-center" aria-label="Страницы справочника">
+        {% if page_obj.has_previous %}
+          <a href="{% querystring page=page_obj.previous_page_number %}">Назад</a>
+        {% endif %}
+        <span>Страница {{ page_obj.number }} из {{ paginator.num_pages }}</span>
+        {% if page_obj.has_next %}
+          <a href="{% querystring page=page_obj.next_page_number %}">Вперёд</a>
+        {% endif %}
+      </nav>
+    {% endif %}
+  </main>
+{% endblock %}

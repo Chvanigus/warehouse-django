@@ -1,0 +1,12 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="{% static 'libs/datatables/datatables.min.css' %}">
+{% endblock %}
+
+{% block extra_javascript %}
+  <script src="{% static 'libs/datatables/datatables.min.js' %}"></script>
+  <script src="{% static 'js/pages/report-datatable.init.js' %}"
+          data-language-url="{% static 'json/russian_datatable.json' %}"></script>
+{% endblock %}
