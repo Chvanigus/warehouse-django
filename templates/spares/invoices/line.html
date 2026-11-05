@@ -1,4 +1,4 @@
-<fieldset class="workspace-panel operation-form-panel mb-2" data-invoice-line{% if line.DELETE.value %} hidden{% endif %}>
+<fieldset class="workspace-panel operation-form-panel mb-2" data-form-row{% if line.DELETE.value %} hidden{% endif %}>
   <legend class="h6">Позиция <span data-line-number>{{ line_number }}</span></legend>
   <div class="operation-fields">
     {% for field in line.visible_fields %}

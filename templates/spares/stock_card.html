@@ -1,0 +1,88 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Движение запчасти{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/operations.css' %}">{% endblock %}
+
+{% block content %}
+  <main class="workspace operation-workspace">
+    <div class="page-heading operation-heading">
+      <div>
+        <p class="eyebrow mb-2">Карточка движения</p>
+        <h1>Движение запчасти</h1>
+        <p class="muted-copy mb-0">{{ stock.spare }} · {{ stock.warehouse }} · {{ stock.company }}</p>
+      </div>
+      <a class="btn btn-outline-primary" href="{% url 'spares:stock_report' %}">К остаткам</a>
+    </div>
+
+    <section class="workspace-panel p-3 p-lg-4 mb-4" aria-labelledby="current-stock-title">
+      <h2 class="h5" id="current-stock-title">Текущий остаток</h2>
+      <p class="mb-1"><strong>{{ stock.actual_balance|floatformat:'-2' }}</strong> {{ stock.measure|default_if_none:'' }}</p>
+      <p class="muted-copy mb-0">Цена позиции {{ stock.price|floatformat:'2' }}. В карточке видны операции, доступные вашей роли.</p>
+      {% if legacy_url %}<p class="mt-2 mb-0"><a href="{{ legacy_url }}">Старые переносы по запчасти</a></p>{% endif %}
+    </section>
+
+    <section class="workspace-panel operation-filters" aria-label="Фильтры движения">
+      <form method="get" role="search">
+        {% for field in filters %}
+          <div class="operation-filter">
+            <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+            {{ field }}
+            {% if field.errors %}<div class="text-danger" role="alert">{{ field.errors }}</div>{% endif %}
+          </div>
+        {% endfor %}
+        <div class="operation-filter-actions">
+          <button type="submit" class="btn btn-primary">Показать</button>
+          {% if filters.has_changed or filters.errors %}
+            <a class="btn btn-outline-secondary" href="{% url 'spares:stock_card' stock.pk %}">Сбросить</a>
+          {% endif %}
+        </div>
+      </form>
+    </section>
+
+    <section class="workspace-panel operation-journal" aria-labelledby="stock-history">
+      <div class="operation-journal-head">
+        <h2 id="stock-history">История движения</h2>
+        {% if entries %}<span class="muted-copy">Найдено {{ page_obj.paginator.count }}</span>{% endif %}
+      </div>
+      {% if entries %}
+        <ol class="operation-records list-unstyled mb-0">
+          {% for entry in entries %}
+            <li class="operation-record">
+              <div class="operation-record-main">
+                <time class="operation-record-date" datetime="{% if entry.event_time %}{{ entry.event_time|date:'c' }}{% else %}{{ entry.event_date|date:'Y-m-d' }}{% endif %}">
+                  {{ entry.event_date|date:'d.m.Y' }}{% if entry.event_time %} {{ entry.event_time|time:'H:i' }}{% endif %}
+                </time>
+                <h3>{{ entry.label }}</h3>
+                {% if entry.details %}<p class="muted-copy">{{ entry.details|linebreaksbr }}</p>{% endif %}
+              </div>
+              <dl class="operation-record-facts">
+                <div>
+                  <dt>Изменение</dt>
+                  <dd class="operation-quantity{% if entry.delta > 0 %} operation-quantity-in{% elif entry.delta < 0 %} operation-quantity-out{% endif %}">
+                    {% if entry.delta > 0 %}+{% endif %}{{ entry.delta|floatformat:'-2' }} {{ stock.measure|default_if_none:'' }}
+                  </dd>
+                </div>
+              </dl>
+              <div class="operation-record-actions">
+                <a class="btn btn-sm btn-outline-secondary" href="{{ entry.url }}">К записи № {{ entry.event_pk }}</a>
+              </div>
+            </li>
+          {% endfor %}
+        </ol>
+        {% if page_obj.has_other_pages %}
+          <nav class="operation-pagination" aria-label="Страницы истории движения">
+            {% if page_obj.has_previous %}<a class="btn btn-sm btn-outline-secondary" href="{% querystring page=page_obj.previous_page_number %}">Назад</a>{% endif %}
+            <span>Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span>
+            {% if page_obj.has_next %}<a class="btn btn-sm btn-outline-secondary" href="{% querystring page=page_obj.next_page_number %}">Далее</a>{% endif %}
+          </nav>
+        {% endif %}
+      {% else %}
+        <p class="muted-copy p-4 mb-0">
+          {% if filters.errors %}Проверьте фильтры.
+          {% elif filters.has_changed %}По выбранным условиям операций нет.
+          {% else %}Для этой позиции нет доступных операций.{% endif %}
+        </p>
+      {% endif %}
+    </section>
+  </main>
+{% endblock %}

@@ -1,0 +1,3 @@
+<span class="badge {% if sheet.status == 'approved' %}text-bg-success{% elif sheet.status == 'rejected' %}text-bg-secondary{% else %}text-bg-warning{% endif %}">
+  {{ sheet.get_status_display }}
+</span>

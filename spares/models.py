@@ -487,5 +487,6 @@ class Movement(SpareMixin):
 
 
 from .invoice_models import ReceiptInvoice
+from .inventory_sheet_models import InventorySheet, InventorySheetLine
 from .threshold_models import StockMinimum
 from .transfer_models import StockTransfer

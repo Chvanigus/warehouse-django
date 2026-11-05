@@ -76,6 +76,7 @@ class InventoryCountCreateView(LoginRequiredMixin, PermissionRequiredMixin, Form
 
 class InventoryCountListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
     model = InventoryCount
+    queryset = InventoryCount.objects.select_related('sheet_line__sheet')
     permission_required = 'spares.view_inventorycount'
     template_name = 'spares/inventory/list.html'
     context_object_name = 'entries'

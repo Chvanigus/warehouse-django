@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Новая инвентаризационная ведомость{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/operations.css' %}">{% endblock %}
+
+{% block content %}
+  <main class="workspace operation-workspace">
+    <div class="page-heading operation-heading">
+      <div>
+        <p class="eyebrow">Инвентаризация</p>
+        <h1>Новая инвентаризационная ведомость</h1>
+        <p class="muted-copy">Запишите фактические количества за один обход склада и передайте их на проверку.</p>
+      </div>
+      {% if perms.spares.view_inventorysheet %}
+        <a class="btn btn-outline-secondary" href="{% url 'inventory_sheets:list' %}">К ведомостям</a>
+      {% endif %}
+    </div>
+    <section class="workspace-panel operation-form-panel mb-3">
+      <form method="get" action="{% url 'inventory_sheets:add' %}">
+        {% include 'spares/invoices/field.html' with field=chooser.warehouse %}
+        <button class="btn btn-outline-primary mt-3" type="submit">Загрузить остатки склада</button>
+      </form>
+    </section>
+    {% if warehouse and has_stocks %}
+      <form method="post" data-line-editor>
+        {% csrf_token %}
+        <section class="workspace-panel operation-form-panel mb-3">
+          <h2>{{ warehouse }}</h2>
+          {% for field in form.hidden_fields %}{{ field }}{{ field.errors }}{% endfor %}
+          {% if form.non_field_errors %}
+            <div class="alert alert-warning" role="alert">
+              {{ form.non_field_errors }}
+              <a href="{% url 'inventory_sheets:add' %}?warehouse={{ warehouse.pk }}">Загрузить актуальные остатки</a>
+            </div>
+          {% endif %}
+          {% include 'spares/invoices/field.html' with field=form.note %}
+        </section>
+        {{ lines.management_form }}
+        {% if lines.non_form_errors %}
+          <div class="alert alert-danger" role="alert">{{ lines.non_form_errors }}</div>
+        {% endif %}
+        <div data-form-rows>
+          {% for line in lines %}
+            {% include 'spares/invoices/line.html' with line_number=forloop.counter %}
+          {% endfor %}
+        </div>
+        <template data-empty-line>
+          {% include 'spares/invoices/line.html' with line=lines.empty_form %}
+        </template>
+        <div class="d-flex flex-wrap gap-2 mt-3">
+          <button class="btn btn-outline-secondary" type="button" data-add-line>Добавить позицию</button>
+          <button class="btn btn-primary" type="submit">Передать на проверку</button>
+        </div>
+      </form>
+    {% elif warehouse %}
+      <p class="workspace-panel p-4">Для выбранного склада пока нет позиций.</p>
+    {% endif %}
+  </main>
+{% endblock %}
+
+{% block extra_javascript %}
+  <script src="{% static 'js/pages/formset-lines.js' %}"></script>
+{% endblock %}

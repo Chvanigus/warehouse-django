@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Инвентаризационные ведомости{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/operations.css' %}">{% endblock %}
+
+{% block content %}
+  <main class="workspace operation-workspace">
+    <div class="page-heading operation-heading">
+      <div>
+        <p class="eyebrow">Инвентаризация</p>
+        <h1>Инвентаризационные ведомости</h1>
+        <p class="muted-copy">Пересчёты по складам и решения контролёров.</p>
+      </div>
+      <div class="d-flex flex-wrap gap-2">
+        {% if perms.spares.view_inventorycount %}
+          <a class="btn btn-outline-secondary" href="{% url 'inventory:list' %}">Журнал пересчётов</a>
+        {% endif %}
+        {% if perms.spares.add_inventorysheet %}
+          <a class="btn btn-primary" href="{% url 'inventory_sheets:add' %}">Новая ведомость</a>
+        {% endif %}
+      </div>
+    </div>
+    {% if sheets %}
+      <div class="workspace-panel table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead><tr><th scope="col">Ведомость</th><th scope="col">Склад</th><th scope="col">Дата и автор</th><th scope="col">Позиций</th><th scope="col">Статус</th></tr></thead>
+          <tbody>
+            {% for sheet in sheets %}
+              <tr>
+                <th scope="row"><a href="{% url 'inventory_sheets:detail' sheet.pk %}">№ {{ sheet.pk }}</a></th>
+                <td>{{ sheet.warehouse }}</td>
+                <td>{{ sheet.created_at|date:"d.m.Y H:i" }}<span class="d-block small text-secondary">{{ sheet.created_by_name }}</span></td>
+                <td>{{ sheet.line_count }}</td>
+                <td>{% include 'spares/inventory_sheets/status.html' %}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% if is_paginated %}
+          <nav class="operation-pagination" aria-label="Страницы ведомостей">
+            {% if page_obj.has_previous %}<a class="btn btn-sm btn-outline-secondary" href="{% querystring page=page_obj.previous_page_number %}">Назад</a>{% endif %}
+            <span>Страница {{ page_obj.number }} из {{ paginator.num_pages }}</span>
+            {% if page_obj.has_next %}<a class="btn btn-sm btn-outline-secondary" href="{% querystring page=page_obj.next_page_number %}">Далее</a>{% endif %}
+          </nav>
+        {% endif %}
+      </div>
+    {% else %}
+      <p class="workspace-panel p-4">Ведомостей пока нет.</p>
+    {% endif %}
+  </main>
+{% endblock %}

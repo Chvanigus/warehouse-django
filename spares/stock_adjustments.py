@@ -16,6 +16,12 @@ def stock_identity_label(stock):
 
 def save_manual_stock(stock, *, actor, reason):
     """Сохранить ручной ввод остатка и историю изменения одной транзакцией."""
+    record_manual_stock(stock, actor=actor, reason=reason)
+    return stock
+
+
+def record_manual_stock(stock, *, actor, reason):
+    """Вернуть связанную запись журнала, если остаток изменился."""
     using = router.db_for_write(Stock, instance=stock)
     opening = stock._state.adding
     with transaction.atomic(using=using):
@@ -43,9 +49,9 @@ def save_manual_stock(stock, *, actor, reason):
 
         stock.save(using=using, force_insert=opening)
         if before != after:
-            StockAdjustment.objects.using(using).create(
+            return StockAdjustment.objects.using(using).create(
                 stock=stock, stock_label=stock_identity_label(stock),
                 actor=actor, actor_name=actor.get_username(),
                 before=before, after=after, reason=reason,
             )
-    return stock
+    return None

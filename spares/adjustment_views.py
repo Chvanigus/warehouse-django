@@ -1,5 +1,6 @@
 from re import escape
 
+from django import forms
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.db.models import Q
 from django.utils.functional import cached_property
@@ -7,6 +8,12 @@ from django.views.generic import ListView
 
 from .forms import StockJournalFilterForm
 from .models import StockAdjustment
+
+
+class AdjustmentFilterForm(StockJournalFilterForm):
+    entry = forms.IntegerField(
+        label='Запись', required=False, min_value=1, max_value=2**63 - 1, widget=forms.HiddenInput,
+    )
 
 
 class StockAdjustmentListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
@@ -18,12 +25,12 @@ class StockAdjustmentListView(LoginRequiredMixin, PermissionRequiredMixin, ListV
 
     @cached_property
     def filters(self):
-        form = StockJournalFilterForm(self.request.GET or None)
+        form = AdjustmentFilterForm(self.request.GET or None)
         form.fields['q'].widget.attrs['placeholder'] = 'Запчасть, склад, автор или причина'
         return form
 
     def get_queryset(self):
-        queryset = super().get_queryset()
+        queryset = super().get_queryset().select_related('sheet_line')
         if not self.filters.is_bound:
             return queryset
         if not self.filters.is_valid():
@@ -41,10 +48,13 @@ class StockAdjustmentListView(LoginRequiredMixin, PermissionRequiredMixin, ListV
             queryset = queryset.filter(created_at__date__lte=data['date_to'])
         if data['stock']:
             queryset = queryset.filter(stock_id=data['stock'])
+        if data['entry']:
+            queryset = queryset.filter(pk=data['entry'])
         return queryset
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['filters'] = self.filters
         context['stock_id'] = self.filters.cleaned_data.get('stock') if self.filters.is_valid() else None
+        context['entry_id'] = self.filters.cleaned_data.get('entry') if self.filters.is_valid() else None
         return context

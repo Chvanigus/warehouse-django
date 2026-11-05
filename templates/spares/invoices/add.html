@@ -17,7 +17,7 @@
         {% if perms.spares.view_receipt %}<a class="btn btn-outline-secondary" href="{% url 'invoices:list' %}">К накладным</a>{% endif %}
       </div>
     </div>
-    <form method="post" data-invoice-form>
+    <form method="post" data-line-editor>
       {% csrf_token %}
       <section class="workspace-panel operation-form-panel mb-3" aria-labelledby="invoice-header">
         <h2 id="invoice-header">Реквизиты</h2>
@@ -27,7 +27,7 @@
       <h2 class="h5 mt-4 mb-3">Позиции</h2>
       {% if lines.non_form_errors %}<div class="alert alert-danger" role="alert">{{ lines.non_form_errors }}</div>{% endif %}
       {{ lines.management_form }}
-      <div data-invoice-lines>
+      <div data-form-rows>
         {% for line in lines %}
           {% include 'spares/invoices/line.html' with line_number=forloop.counter %}
         {% endfor %}
@@ -44,5 +44,5 @@
 {% endblock %}
 
 {% block extra_javascript %}
-  <script src="{% static 'js/pages/invoice-lines.js' %}"></script>
+  <script src="{% static 'js/pages/formset-lines.js' %}"></script>
 {% endblock %}

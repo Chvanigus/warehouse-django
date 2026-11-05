@@ -2,6 +2,9 @@
   {% if stock_id %}
     <p class="mb-3"><span class="badge text-bg-light">Позиция № {{ stock_id }}</span></p>
   {% endif %}
+  {% if entry_id %}
+    <p class="mb-3"><span class="badge text-bg-light">Запись № {{ entry_id }}</span></p>
+  {% endif %}
   {% if filters.stock.errors %}
     <div class="alert alert-danger py-2" role="alert">Укажите корректный номер позиции.</div>
   {% endif %}
@@ -19,6 +22,8 @@
         <a class="btn btn-outline-secondary" href="{{ journal_url }}">Сбросить</a>
       {% endif %}
     </div>
-    {{ filters.stock }}
+    {% for field in filters.hidden_fields %}
+      {{ field }}
+    {% endfor %}
   </form>
 </section>

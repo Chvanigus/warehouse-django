@@ -99,7 +99,12 @@
           <tbody role="rowgroup">
               {% for stock in report_data %}
                 <tr role="row">
-                  <th scope="row" role="rowheader" class="fw-semibold">{{ stock.spare.name }}</th>
+                  <th scope="row" role="rowheader" class="fw-semibold">
+                    <a href="{% url 'spares:stock_card' stock.pk %}"
+                       aria-label="Карточка движения · {{ stock.spare.name }} · {{ stock.warehouse }}">
+                      {{ stock.spare.name }}
+                    </a>
+                  </th>
                   <td role="cell" data-label="Артикул">{{ stock.spare.sku|default_if_none:"" }}</td>
                   <td role="cell" data-label="Склад">{{ stock.warehouse }}</td>
                   <td role="cell" data-label="Фирма">{{ stock.company }}</td>

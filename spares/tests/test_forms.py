@@ -58,13 +58,17 @@ class WarehouseOperationTests(TestCase):
 
     def test_journal_combines_text_search_and_dates(self):
         self.client.force_login(self.operator)
-        self.add_receipt()
+        receipt = self.add_receipt()
         url = reverse('operations:receipts')
         self.assertContains(self.client.get(url, {'q': 'фильтр', 'date_from': '2026-01-10'}), 'НК-100')
         self.assertNotContains(self.client.get(url, {'q': 'фильтр', 'date_to': '2026-01-09'}), 'НК-100')
         response = self.client.get(url, {'date_from': '2026-02-01', 'date_to': '2026-01-01'})
         self.assertContains(response, 'Конец периода должен быть не раньше начала')
         self.assertNotContains(response, 'НК-100')
+        self.client.post(reverse('operations:receipt_add'), {**self.receipt_data, 'invoice_number': 'НК-200'})
+        response = self.client.get(url, {'entry': receipt.pk})
+        self.assertContains(response, 'НК-100')
+        self.assertNotContains(response, 'НК-200')
 
     def test_operator_can_create_and_cancel_receipt_without_overwriting_it(self):
         self.client.force_login(self.operator)

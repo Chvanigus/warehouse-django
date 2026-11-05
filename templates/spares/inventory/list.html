@@ -12,9 +12,14 @@
         <h1>Инвентаризация</h1>
         <p class="muted-copy">История пересчётов и расхождений на момент сверки.</p>
       </div>
-      {% if perms.spares.view_stock %}
-        <a class="btn btn-outline-primary" href="{% url 'spares:stock_report' %}">К остаткам</a>
-      {% endif %}
+      <div class="d-flex flex-wrap gap-2">
+        {% if perms.spares.view_inventorysheet %}
+          <a class="btn btn-outline-primary" href="{% url 'inventory_sheets:list' %}">Инвентаризационные ведомости</a>
+        {% endif %}
+        {% if perms.spares.view_stock %}
+          <a class="btn btn-outline-secondary" href="{% url 'spares:stock_report' %}">К остаткам</a>
+        {% endif %}
+      </div>
     </div>
     {% include 'spares/journal_filters.html' %}
 
@@ -31,6 +36,14 @@
                 <time class="operation-record-date" datetime="{{ entry.counted_at|date:'c' }}">{{ entry.counted_at|date:'d.m.Y H:i' }}</time>
                 <h3>{{ entry.stock_label }}</h3>
                 <p class="muted-copy">Пересчитал {{ entry.actor_name }}</p>
+                {% if entry.sheet_line %}
+                  <p class="small">
+                    <span class="badge text-bg-light">{{ entry.sheet_line.sheet.get_status_display }}</span>
+                    {% if perms.spares.view_inventorysheet %}
+                      <a href="{% url 'inventory_sheets:detail' entry.sheet_line.sheet_id %}">Ведомость № {{ entry.sheet_line.sheet_id }}</a>
+                    {% endif %}
+                  </p>
+                {% endif %}
               </div>
               <dl class="operation-record-facts">
                 <div><dt>По учёту</dt><dd class="operation-quantity">{{ entry.book_quantity|floatformat:'-2' }}</dd></div>
@@ -47,7 +60,7 @@
                   <div class="operation-field-wide"><dt>Примечание</dt><dd>{{ entry.note|linebreaksbr }}</dd></div>
                 {% endif %}
               </dl>
-              {% if entry.stock_id and perms.spares.change_stock %}
+              {% if entry.stock_id and perms.spares.change_stock and not entry.sheet_line %}
                 <div class="operation-record-actions">
                   <a class="btn btn-sm btn-outline-secondary" href="{% url 'catalog:stock-edit' entry.stock_id %}">Корректировка</a>
                 </div>

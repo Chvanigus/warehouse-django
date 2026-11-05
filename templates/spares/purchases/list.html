@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Список закупок{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/stock-workspace.css' %}">{% endblock %}
+
+{% block content %}
+  <main class="workspace stock-workspace">
+    <div class="page-heading">
+      <div>
+        <p class="eyebrow mb-2">Пополнение запасов</p>
+        <h1>Список закупок</h1>
+        <p class="muted-copy mb-0 mt-2">Количество к заказу — разница между минимумом и суммой остатков по ценовым партиям.</p>
+      </div>
+      {% if shortages %}
+        {% querystring page=None as export_query %}
+        <a class="btn btn-outline-primary" href="{% url 'purchases:export' %}{{ export_query }}">Скачать XLSX</a>
+      {% endif %}
+    </div>
+
+    <section class="workspace-panel p-3 p-lg-4 mb-4" aria-labelledby="purchase-filters">
+      <h2 id="purchase-filters" class="h6 mb-3">Фильтры</h2>
+      <form method="get" action="{% url 'purchases:list' %}">
+        {% include 'spares/stock_filter_fields.html' with form=filters %}
+        <div class="d-flex flex-wrap gap-2 mt-3">
+          {% if filters.has_changed %}
+            <a class="btn btn-outline-secondary" href="{% url 'purchases:list' %}">Сбросить</a>
+          {% endif %}
+          <button class="btn btn-primary" type="submit">Показать</button>
+        </div>
+      </form>
+    </section>
+
+    {% regroup shortages by warehouse as warehouse_groups %}
+    {% for warehouse in warehouse_groups %}
+      <section class="workspace-panel table-responsive p-3 mb-3" aria-labelledby="warehouse-{{ warehouse.grouper.pk }}">
+        <h2 class="h5 mb-3" id="warehouse-{{ warehouse.grouper.pk }}">{{ warehouse.grouper.name }}</h2>
+        <table class="table table-hover align-middle mb-0 stock-table" role="table">
+          <thead>
+            <tr>
+              <th scope="col">Запчасть</th>
+              <th scope="col">Фирма</th>
+              <th scope="col">Единица</th>
+              <th scope="col" class="stock-quantity">На остатке</th>
+              <th scope="col" class="stock-quantity">Минимум</th>
+              <th scope="col" class="stock-quantity">К заказу</th>
+            </tr>
+          </thead>
+          <tbody role="rowgroup">
+            {% for row in warehouse.list %}
+              <tr role="row">
+                <th scope="row" role="rowheader">
+                  {{ row.spare.name }}
+                  {% if row.spare.sku %}<span class="d-block small text-secondary">{{ row.spare.sku }}</span>{% endif %}
+                </th>
+                <td role="cell" data-label="Фирма">{{ row.company }}</td>
+                <td role="cell" data-label="Единица">{{ row.measure|default_if_none:"—" }}</td>
+                <td role="cell" data-label="На остатке" class="stock-quantity">{{ row.available|floatformat:'-2' }}</td>
+                <td role="cell" data-label="Минимум" class="stock-quantity">{{ row.minimum|floatformat:'-2' }}</td>
+                <td role="cell" data-label="К заказу" class="stock-quantity"><strong>{{ row.shortage|floatformat:'-2' }}</strong></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </section>
+    {% empty %}
+      {% if filters.errors %}
+        <p class="workspace-panel muted-copy p-4">Исправьте отмеченные поля и примените фильтры ещё раз.</p>
+      {% else %}
+        <p class="workspace-panel muted-copy p-4">Позиции к закупке по этим условиям отсутствуют.</p>
+      {% endif %}
+    {% endfor %}
+
+    {% if is_paginated %}
+      <nav class="d-flex gap-3 align-items-center mt-3" aria-label="Страницы списка закупок">
+        {% if page_obj.has_previous %}<a href="{% querystring page=page_obj.previous_page_number %}">Назад</a>{% endif %}
+        <span>Страница {{ page_obj.number }} из {{ paginator.num_pages }}</span>
+        {% if page_obj.has_next %}<a href="{% querystring page=page_obj.next_page_number %}">Вперёд</a>{% endif %}
+      </nav>
+    {% endif %}
+  </main>
+{% endblock %}

@@ -45,6 +45,12 @@ class OperationMixin(PermissionRequiredMixin):
         return context
 
 
+class OperationJournalFilterForm(JournalFilterForm):
+    entry = forms.IntegerField(
+        label='Запись', min_value=1, max_value=2**63 - 1, required=False, widget=forms.HiddenInput,
+    )
+
+
 class OperationListView(OperationMixin, ListView):
     permission_action = 'view'
     paginate_by = 30
@@ -60,7 +66,7 @@ class OperationListView(OperationMixin, ListView):
 
     @cached_property
     def filters(self):
-        form = JournalFilterForm(self.request.GET or None)
+        form = OperationJournalFilterForm(self.request.GET or None)
         form.fields['q'].widget.attrs['placeholder'] = self.search_hint
         return form
 
@@ -83,6 +89,8 @@ class OperationListView(OperationMixin, ListView):
             queryset = queryset.filter(**{f'{self.date_field}__gte': data['date_from']})
         if data['date_to']:
             queryset = queryset.filter(**{f'{self.date_field}__lte': data['date_to']})
+        if data['entry']:
+            queryset = queryset.filter(pk=data['entry'])
         return queryset
 
     def get_context_data(self, **kwargs):
@@ -90,6 +98,7 @@ class OperationListView(OperationMixin, ListView):
         context['filters'] = self.filters
         context['today'] = timezone.localdate()
         context['filters_active'] = any(self.request.GET.get(name) for name in self.filters.fields)
+        context['entry_id'] = self.filters.cleaned_data.get('entry') if self.filters.is_valid() else None
         if self.allow_add and self.request.user.has_perm(self.permission_for('add')):
             context['add_url'] = reverse(self.add_route or f'operations:{self.operation_name}_add')
             context['add_label'] = self.add_label

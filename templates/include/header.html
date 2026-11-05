@@ -19,7 +19,7 @@
               </li>
               {% if perms.spares.view_stock %}
                 <li class="nav-item">
-                  <a class="nav-link{% if route == 'stock_report' or route == 'stock-edit' or route == 'stock-add' or route == 'stock_adjustments' %} active{% endif %}"
+                  <a class="nav-link{% if route == 'stock_report' or route == 'stock_card' or route == 'stock-edit' or route == 'stock-add' or route == 'stock_adjustments' %} active{% endif %}"
                      href="{% url 'spares:stock_report' %}" {% if route == 'stock_report' %}aria-current="page"{% endif %}>Остатки</a>
                 </li>
               {% endif %}
@@ -36,15 +36,21 @@
                 </li>
               {% endif %}
               <li class="nav-item dropdown">
-                <button class="nav-link dropdown-toggle{% if section == 'inventory' or section == 'transfers' or section == 'catalog' and route != 'stock-edit' and route != 'stock-add' or route == 'movements' or 'report' in route and route != 'stock_report' %} active{% endif %}"
+                <button class="nav-link dropdown-toggle{% if section == 'inventory' or section == 'inventory_sheets' or section == 'transfers' or section == 'purchases' or section == 'catalog' and route != 'stock-edit' and route != 'stock-add' or route == 'movements' or 'report' in route and route != 'stock_report' %} active{% endif %}"
                         type="button" data-bs-toggle="dropdown" aria-expanded="false">Ещё</button>
                 <ul class="dropdown-menu">
                   <li><a class="dropdown-item" href="{% url 'catalog:index' %}">Справочники</a></li>
                   {% if perms.spares.view_stockminimum %}
                     <li><a class="dropdown-item" href="{% url 'catalog:minimums' %}">Минимальные остатки</a></li>
+                    {% if perms.spares.view_stock %}
+                      <li><a class="dropdown-item" href="{% url 'purchases:list' %}">Список закупок</a></li>
+                    {% endif %}
                   {% endif %}
                   {% if perms.spares.view_inventorycount %}
                     <li><a class="dropdown-item" href="{% url 'inventory:list' %}">Инвентаризация</a></li>
+                  {% endif %}
+                  {% if perms.spares.view_inventorysheet %}
+                    <li><a class="dropdown-item" href="{% url 'inventory_sheets:list' %}">Инвентаризационные ведомости</a></li>
                   {% endif %}
                   {% if perms.spares.view_stocktransfer %}
                     <li><a class="dropdown-item" href="{% url 'transfers:list' %}">Перемещения</a></li>

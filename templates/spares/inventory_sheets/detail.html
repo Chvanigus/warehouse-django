@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Инвентаризационная ведомость № {{ sheet.pk }}{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/operations.css' %}">{% endblock %}
+
+{% block content %}
+  <main class="workspace operation-workspace">
+    <div class="page-heading operation-heading">
+      <div>
+        <p class="eyebrow">Инвентаризация</p>
+        <h1>Инвентаризационная ведомость № {{ sheet.pk }}</h1>
+        <p class="muted-copy">{{ sheet.warehouse }} · {{ sheet.created_at|date:"d.m.Y H:i" }} · {{ sheet.created_by_name }}</p>
+      </div>
+      <a class="btn btn-outline-secondary" href="{% url 'inventory_sheets:list' %}">К ведомостям</a>
+    </div>
+    <section class="workspace-panel operation-form-panel mb-3" aria-label="Статус ведомости">
+      <p class="mb-0">{% include 'spares/inventory_sheets/status.html' %}</p>
+      {% if sheet.note %}<p class="mb-0 mt-2">{{ sheet.note|linebreaksbr }}</p>{% endif %}
+      {% if sheet.reviewed_at %}
+        <p class="mb-0 mt-2">{{ sheet.reviewed_at|date:"d.m.Y H:i" }} · Контролёр {{ sheet.reviewed_by_name }}</p>
+        {% if sheet.review_note %}<p class="mb-0 mt-2">{{ sheet.review_note|linebreaksbr }}</p>{% endif %}
+      {% endif %}
+    </section>
+    <div class="workspace-panel table-responsive mb-3">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr><th scope="col">Позиция</th><th scope="col">По учёту</th><th scope="col">Фактически</th><th scope="col">Разница</th><th scope="col">Корректировка</th></tr>
+        </thead>
+        <tbody>
+          {% for line in sheet.lines.all %}
+            {% with count=line.count %}
+              <tr>
+                <th scope="row">{{ count.stock_label }}</th>
+                <td>{{ count.book_quantity|floatformat:'-2' }}</td>
+                <td>{{ count.counted_quantity|floatformat:'-2' }}</td>
+                <td>{% if count.difference > 0 %}+{% endif %}{{ count.difference|floatformat:'-2' }}</td>
+                <td>
+                  {% if line.adjustment_id %}
+                    {% if perms.spares.view_stockadjustment %}
+                      <a href="{% url 'spares:stock_adjustments' %}?{% if count.stock_id %}stock={{ count.stock_id }}&amp;{% endif %}q={{ line.adjustment.reason|urlencode }}">№ {{ line.adjustment_id }}</a>
+                    {% else %}№ {{ line.adjustment_id }}{% endif %}
+                  {% elif sheet.status == 'pending' and count.difference %}На проверке
+                  {% else %}—{% endif %}
+                </td>
+              </tr>
+            {% endwith %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if review_form.non_field_errors %}
+      <div class="alert alert-warning" role="alert">{{ review_form.non_field_errors }}</div>
+    {% endif %}
+    {% if can_review %}
+      <section class="workspace-panel operation-form-panel">
+        <h2>Проверка ведомости</h2>
+        <p class="muted-copy">Подтверждение применит все расхождения и создаст записи журнала корректировок.</p>
+        <form method="post" action="{% url 'inventory_sheets:approve' sheet.pk %}">
+          {% csrf_token %}
+          {{ review_form.decision.errors }}
+          {% include 'spares/invoices/field.html' with field=review_form.note %}
+          <div class="d-flex flex-wrap gap-2 mt-3">
+            <button class="btn btn-primary" type="submit" name="decision" value="approve">Подтвердить расхождения</button>
+            <button class="btn btn-outline-danger" type="submit" name="decision" value="reject">Отклонить ведомость</button>
+          </div>
+        </form>
+      </section>
+    {% elif sheet.status == 'pending' and sheet.created_by_id == request.user.pk %}
+      <p class="muted-copy">Ведомость проверяет другой сотрудник с правом подтверждения.</p>
+    {% endif %}
+  </main>
+{% endblock %}

@@ -17,8 +17,14 @@
     </div>
 
     <section class="workspace-panel operation-filters" aria-label="Фильтры журнала">
+      {% if entry_id %}
+        <p class="mb-3"><span class="badge text-bg-light">Запись № {{ entry_id }}</span></p>
+      {% endif %}
+      {% if filters.entry.errors %}
+        <div class="alert alert-danger" role="alert">{{ filters.entry.errors }}</div>
+      {% endif %}
       <form method="get" role="search">
-        {% for field in filters %}
+        {% for field in filters.visible_fields %}
           <div class="operation-filter">
             <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
             {{ field }}
@@ -29,6 +35,7 @@
           <button type="submit" class="btn btn-outline-primary">Найти</button>
           {% if filters_active %}<a href="{{ list_url }}" class="btn btn-outline-secondary">Сбросить</a>{% endif %}
         </div>
+        {{ filters.entry }}
       </form>
     </section>
 

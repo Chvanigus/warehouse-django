@@ -35,6 +35,9 @@
                 </time>
                 <h3>{{ entry.stock_label }}</h3>
                 <p class="muted-copy">Автор {{ entry.actor_name }}</p>
+                {% if perms.spares.view_inventorysheet and entry.sheet_line %}
+                  <a class="small" href="{% url 'inventory_sheets:detail' entry.sheet_line.sheet_id %}">Ведомость № {{ entry.sheet_line.sheet_id }}</a>
+                {% endif %}
               </div>
               <dl class="operation-record-facts">
                 <div>
