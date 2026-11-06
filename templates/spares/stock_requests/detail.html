@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Заявка № {{ stock_request.pk }}{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/operations.css' %}">{% endblock %}
+
+{% block content %}
+  <main class="workspace operation-workspace">
+    <div class="page-heading operation-heading">
+      <div>
+        <p class="eyebrow">Заявка № {{ stock_request.pk }} · {{ stock_request.get_kind_display }}</p>
+        <h1>{{ stock_request.title }}</h1>
+        <p class="muted-copy">{{ stock_request.created_at|date:"d.m.Y H:i" }} · {{ stock_request.created_by_name }}</p>
+      </div>
+      <a class="btn btn-outline-secondary" href="{% url 'stock_requests:list' %}">К заявкам</a>
+    </div>
+    <section class="workspace-panel operation-form-panel mb-3" aria-label="Статус заявки">
+      <p class="mb-0">{% include 'spares/stock_requests/status.html' %}</p>
+      {% if stock_request.applied_automatically %}
+        <p class="mb-0 mt-2">Проведена сразу при подаче.</p>
+      {% endif %}
+      {% if stock_request.reviewed_at %}
+        <p class="mb-0 mt-2">{{ stock_request.reviewed_at|date:"d.m.Y H:i" }} · {{ stock_request.reviewed_by_name }}</p>
+      {% endif %}
+      {% if stock_request.review_note %}
+        <p class="mb-0 mt-2"><strong>Причина отклонения</strong></p>
+        <p class="mb-0">{{ stock_request.review_note|linebreaksbr }}</p>
+      {% endif %}
+      {% if result_url %}<a class="btn btn-outline-secondary mt-3" href="{{ result_url }}">Открыть проведённый документ</a>{% endif %}
+    </section>
+    {% if fields %}
+      <section class="workspace-panel operation-form-panel mb-3">
+        <h2>Реквизиты заявки</h2>
+        <dl class="row mb-0">
+          {% for label, value in fields %}
+            <dt class="col-sm-4">{{ label }}</dt><dd class="col-sm-8">{{ value|linebreaksbr }}</dd>
+          {% endfor %}
+        </dl>
+      </section>
+    {% endif %}
+    {% if lines %}
+      <div class="workspace-panel table-responsive mb-3">
+        <table class="table table-hover align-middle mb-0">
+          <caption class="visually-hidden">Позиции заявки</caption>
+          <thead><tr><th scope="col">Запчасть</th><th scope="col">Единица</th><th scope="col">Количество</th><th scope="col">Цена</th></tr></thead>
+          <tbody>
+            {% for line in lines %}
+              <tr><th scope="row">{{ line.part }}</th><td>{{ line.measure }}</td><td>{{ line.quantity }}</td><td>{{ line.price }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+    {% if can_review %}
+      <section class="workspace-panel operation-form-panel">
+        <h2>Решение по заявке</h2>
+        <p class="muted-copy">Согласование проведёт документ и изменит складские остатки.</p>
+        <form method="post" action="{% url 'stock_requests:approve' stock_request.pk %}">
+          {% csrf_token %}
+          <button class="btn btn-primary" type="submit">Согласовать и провести</button>
+        </form>
+        <form method="post" class="mt-4" action="{% url 'stock_requests:reject' stock_request.pk %}">
+          {% csrf_token %}
+          <label class="form-label" for="reject-reason">Причина отклонения</label>
+          <textarea class="form-control" id="reject-reason" name="reason" maxlength="500" rows="3" required></textarea>
+          <button class="btn btn-outline-danger mt-3" type="submit">Отклонить заявку</button>
+        </form>
+      </section>
+    {% elif stock_request.status == 'pending' and stock_request.created_by_id == request.user.pk %}
+      <p class="muted-copy">Заявку рассмотрит другой сотрудник с правом согласования.</p>
+    {% endif %}
+  </main>
+{% endblock %}

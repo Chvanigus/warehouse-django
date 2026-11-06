@@ -50,6 +50,10 @@ class StockOperationAdmin(admin.ModelAdmin):
 
 class PostedOperationAdmin(StockOperationAdmin):
     """Разрешает просматривать проведённый документ в админке."""
+    def has_add_permission(self, request):
+        """Проверяет право прямого проведения, чтобы оператор не обошёл очередь заявок."""
+        return request.user.has_perm('spares.approve_stockrequest') and super().has_add_permission(request)
+
     def has_change_permission(self, request, obj=None):
         """Запрещает редактировать проведённые документы в админке."""
         return False

@@ -17,8 +17,8 @@
         {% if perms.spares.view_movement %}
           <a href="{% url 'operations:movements' %}" class="btn btn-outline-secondary">История переносов прихода</a>
         {% endif %}
-        {% if perms.spares.add_stocktransfer %}
-          <a href="{% url 'transfers:add' %}" class="btn btn-primary">Оформить перемещение</a>
+        {% if perms.spares.add_stocktransfer and perms.spares.add_stockrequest %}
+          <a href="{% url 'transfers:add' %}" class="btn btn-primary">{% if perms.spares.approve_stockrequest %}Оформить перемещение{% else %}Подать заявку{% endif %}</a>
         {% endif %}
       </div>
     </div>

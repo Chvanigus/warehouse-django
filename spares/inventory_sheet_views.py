@@ -4,7 +4,7 @@ from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.core import signing
 from django.core.exceptions import ValidationError
-from django.db.models import Count, Prefetch
+from django.db.models import Count, Prefetch, Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views import View
 from django.views.generic import DetailView, ListView
@@ -24,6 +24,13 @@ from .stock_adjustments import stock_version
 SNAPSHOT_SALT = 'spares.inventory-sheet.snapshot.v1'
 
 
+def visible_sheets(queryset, user):
+    """Показывает незавершённые ведомости только автору и проверяющим."""
+    if user.has_perm('spares.approve_inventorysheet'):
+        return queryset
+    return queryset.filter(Q(status=InventorySheet.Status.APPROVED) | Q(created_by=user))
+
+
 class InventorySheetListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
     """Показывает список ведомостей с количеством позиций и состоянием проверки."""
     permission_required = 'spares.view_inventorysheet'
@@ -33,6 +40,18 @@ class InventorySheetListView(LoginRequiredMixin, PermissionRequiredMixin, ListVi
     queryset = InventorySheet.objects.select_related('warehouse').annotate(
         line_count=Count('lines'),
     ).order_by('-created_at', '-pk')
+
+    def get_queryset(self):
+        """Ограничивает список доступными ведомостями и выбранным статусом."""
+        queryset = visible_sheets(super().get_queryset(), self.request.user)
+        status = self.request.GET.get('status')
+        if status in InventorySheet.Status.values:
+            return queryset.filter(status=status)
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        """Передаёт названия статусов и выбранный фильтр для вкладок."""
+        return super().get_context_data(status_choices=InventorySheet.Status.choices, **kwargs)
 
 
 class InventorySheetAddView(LoginRequiredMixin, PermissionRequiredMixin, View):
@@ -97,7 +116,9 @@ class InventorySheetAddView(LoginRequiredMixin, PermissionRequiredMixin, View):
             except ValidationError as error:
                 form.add_error(None, error)
             else:
-                messages.success(request, 'Ведомость передана контролёру.')
+                message = ('Ведомость проведена.' if sheet.status == InventorySheet.Status.APPROVED
+                           else 'Ведомость передана на проверку.')
+                messages.success(request, message)
                 if request.user.has_perm('spares.view_inventorysheet'):
                     return redirect('inventory_sheets:detail', pk=sheet.pk)
                 return redirect('spares:warehouse_main')
@@ -131,7 +152,7 @@ class InventorySheetDetailView(LoginRequiredMixin, PermissionRequiredMixin, Deta
 
     def get_queryset(self):
         """Загружает ведомость вместе со строками и корректировками."""
-        return sheet_details()
+        return visible_sheets(sheet_details(), self.request.user)
 
     def get_context_data(self, **kwargs):
         """Передаёт форму проверки и признак доступности действия."""

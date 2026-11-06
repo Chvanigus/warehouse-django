@@ -22,7 +22,7 @@ class StockWorkspaceTests(TestCase):
         view_stock = permissions.get(codename='view_stock')
         cls.reader.user_permissions.add(view_stock)
         cls.operator.user_permissions.add(view_stock, *permissions.filter(codename__in=(
-            'add_receipt', 'add_stock', 'change_stock', 'add_writeoff',
+            'add_receipt', 'add_stock', 'change_stock', 'add_writeoff', 'add_stockrequest',
         )))
         cls.company = Company.objects.create(name='Главная фирма')
         cls.other_company = Company.objects.create(name='Вторая фирма')

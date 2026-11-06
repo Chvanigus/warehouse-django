@@ -5,6 +5,7 @@ from decimal import Decimal
 from io import BytesIO
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Permission
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.urls import reverse
@@ -14,6 +15,8 @@ from openpyxl import Workbook
 from spares.invoice_models import ReceiptInvoice
 from spares.invoice_xlsx import HEADERS
 from spares.models import Company, Contractors, MeasureMeasurement, Receipt, Spares, Stock, Warehouses
+from spares.request_models import StockRequest
+from spares.request_services import approve_stock_request
 
 
 class InvoiceWorkflowTests(TestCase):
@@ -60,12 +63,24 @@ class InvoiceWorkflowTests(TestCase):
         book.close()
         return SimpleUploadedFile('invoice.xlsx', file.getvalue())
 
+    def log_in_operator(self):
+        """Входит под автором, которому требуется согласование накладной."""
+        user = get_user_model().objects.create_user('receipt-requester')
+        user.user_permissions.add(*Permission.objects.filter(
+            content_type__app_label='spares', codename__in=('add_receipt', 'add_stockrequest', 'view_stockrequest'),
+        ))
+        self.client.force_login(user)
+        return user
+
     def test_manual_invoice_cancels_all_lines_and_preserves_the_document(self):
         """Проверяет создание многострочной накладной и её отмену без потери строк."""
         add = reverse('invoices:add')
         response = self.client.post(add, self.line_data())
         invoice = ReceiptInvoice.objects.get()
         self.assertRedirects(response, reverse('invoices:detail', args=[invoice.pk]))
+        stock_request = StockRequest.objects.get()
+        self.assertTrue(stock_request.applied_automatically)
+        self.assertEqual(stock_request.reviewed_by, self.user)
         self.assertContains(self.client.get(reverse('invoices:list')), 'РН-100')
         self.assertEqual(invoice.lines.count(), 2)
         self.assertEqual(Stock.objects.get(spare=self.first).actual_balance, Decimal('2.50'))
@@ -155,3 +170,35 @@ class InvoiceWorkflowTests(TestCase):
         self.client.force_login(get_user_model().objects.create_user('no-receipts'))
         self.assertEqual(self.client.get(reverse('invoices:upload')).status_code, 403)
         self.assertEqual(self.client.get(reverse('invoices:list')).status_code, 403)
+
+    def test_operator_invoice_waits_for_another_employee(self):
+        """Проверяет, что строки накладной проводятся только после согласования."""
+        operator = self.log_in_operator()
+        response = self.client.post(reverse('invoices:add'), self.line_data())
+        stock_request = StockRequest.objects.get()
+        self.assertRedirects(response, reverse('stock_requests:detail', args=[stock_request.pk]))
+        self.assertEqual((stock_request.status, stock_request.created_by), (StockRequest.Status.PENDING, operator))
+        self.assertFalse(ReceiptInvoice.objects.exists())
+        self.assertFalse(Stock.objects.exists())
+
+        approve_stock_request(stock_request.pk, actor=self.user)
+        invoice = ReceiptInvoice.objects.get()
+        self.assertEqual(invoice.posted_by, self.user)
+        self.assertEqual(invoice.lines.count(), 2)
+        self.assertEqual(Stock.objects.get(spare=self.first).actual_balance, Decimal('2.50'))
+
+    def test_operator_import_confirmation_creates_only_one_pending_request(self):
+        """Проверяет, что повторная отправка предпросмотра не дублирует заявку."""
+        self.log_in_operator()
+        upload = reverse('invoices:upload')
+        preview = self.client.post(
+            upload, {**self.header, 'workbook': self.workbook([('fl-1', None, None, 1, 2)])},
+        )
+        confirmation = preview.context['confirmation']
+        self.assertEqual(self.client.post(upload, {'confirmation': confirmation}).status_code, 302)
+        self.assertContains(
+            self.client.post(upload, {'confirmation': confirmation}), 'Заявка по этому предпросмотру уже существует.',
+        )
+        self.assertEqual(StockRequest.objects.count(), 1)
+        self.assertEqual(StockRequest.objects.get().status, StockRequest.Status.PENDING)
+        self.assertFalse(Stock.objects.exists())

@@ -8,6 +8,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMix
 from django.core import signing
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
 from django.utils.functional import cached_property
@@ -16,6 +17,7 @@ from django.views.generic import FormView, ListView
 from .catalog_forms import STOCK_REVISION_SALT, validate_stock_version
 from .forms import StockJournalFilterForm
 from .inventory_counts import record_inventory_count
+from .inventory_sheet_models import InventorySheet
 from .models import InventoryCount, Stock
 from .stock_adjustments import stock_version
 
@@ -102,8 +104,15 @@ class InventoryCountListView(LoginRequiredMixin, PermissionRequiredMixin, ListVi
 
     def get_queryset(self):
         """Ограничивает историю указанной позицией, текстом поиска и диапазоном дат."""
+        queryset = super().get_queryset()
+        if not self.request.user.has_perm('spares.approve_inventorysheet'):
+            queryset = queryset.filter(
+                Q(sheet_line__isnull=True)
+                | Q(sheet_line__sheet__status=InventorySheet.Status.APPROVED)
+                | Q(sheet_line__sheet__created_by=self.request.user),
+            )
         return self.filters.filter_queryset(
-            super().get_queryset(), search_fields=('stock_label', 'actor_name', 'note'),
+            queryset, search_fields=('stock_label', 'actor_name', 'note'),
             date_field='counted_at__date', exact_fields=(('stock', 'stock_id'),),
         )
 

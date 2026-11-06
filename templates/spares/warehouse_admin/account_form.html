@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+{% load user_filters %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+  <main class="workspace">
+    <div class="page-heading">
+      <div>
+        <p class="eyebrow mb-2">Управление</p>
+        <h1>{{ title }}</h1>
+        {% if account %}<p class="muted-copy mb-0">{{ account.get_username }}</p>{% endif %}
+      </div>
+      <a class="btn btn-outline-secondary" href="{% url 'warehouse_admin:users' %}">К сотрудникам</a>
+    </div>
+
+    <form method="post" class="workspace-panel col-12 col-lg-7 p-3 p-lg-4">
+      {% csrf_token %}
+      {% if account.pk == request.user.pk and form.role %}
+        <p class="muted-copy">Для своей учётной записи можно изменить имя и пароль. Роль и доступ защищены.</p>
+      {% endif %}
+      {% if form.non_field_errors %}
+        <div class="alert alert-danger" role="alert">{{ form.non_field_errors }}</div>
+      {% endif %}
+      {% for field in form %}
+        <div class="mb-3">
+          {% if field.field.widget.input_type == 'checkbox' %}
+            <div class="form-check">
+              {{ field|addclass:'form-check-input' }}
+              <label class="form-check-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+            </div>
+          {% else %}
+            <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {% if field.field.widget.template_name == 'django/forms/widgets/select.html' %}
+              {{ field|addclass:'form-select' }}
+            {% else %}
+              {{ field|addclass:'form-control' }}
+            {% endif %}
+          {% endif %}
+          {% if field.help_text %}<div class="form-text" id="{{ field.auto_id }}_helptext">{{ field.help_text }}</div>{% endif %}
+          {% if field.errors %}<div class="text-danger">{{ field.errors }}</div>{% endif %}
+        </div>
+      {% endfor %}
+      <div class="d-flex flex-wrap gap-2">
+        <button type="submit" class="btn btn-primary">Сохранить</button>
+        <a class="btn btn-outline-secondary" href="{% url 'warehouse_admin:users' %}">Отмена</a>
+        {% if account and form.role %}
+          <a class="btn btn-outline-secondary" href="{% url 'warehouse_admin:password' account.pk %}">Задать пароль</a>
+        {% endif %}
+      </div>
+    </form>
+  </main>
+{% endblock %}

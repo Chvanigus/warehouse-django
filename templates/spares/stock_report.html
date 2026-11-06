@@ -29,8 +29,8 @@
         {% if perms.spares.add_stock %}
           <a class="btn btn-outline-secondary" href="{% url 'catalog:stock-add' %}">Начальный остаток</a>
         {% endif %}
-        {% if perms.spares.add_receipt %}
-          <a class="btn btn-primary" href="{% url 'invoices:add' %}">Оформить приход</a>
+        {% if perms.spares.add_receipt and perms.spares.add_stockrequest %}
+          <a class="btn btn-primary" href="{% url 'invoices:add' %}">{% if perms.spares.approve_stockrequest %}Оформить приход{% else %}Заявка на приход{% endif %}</a>
         {% endif %}
       </div>
     </div>
@@ -84,7 +84,7 @@
                 <th scope="col" class="no-export stock-sortable">На остатке</th>
                 <th scope="col" class="no-export stock-sortable">Цена</th>
                 <th scope="col" class="no-export">Инвентаризация</th>
-                {% if perms.spares.change_stock or perms.spares.add_writeoff or perms.spares.view_stockadjustment or perms.spares.add_inventorycount or perms.spares.view_inventorycount or perms.spares.add_stocktransfer %}<th scope="col" class="no-export">Действия</th>{% endif %}
+                {% if perms.spares.change_stock or perms.spares.add_writeoff and perms.spares.add_stockrequest or perms.spares.view_stockadjustment or perms.spares.add_inventorycount or perms.spares.view_inventorycount or perms.spares.add_stocktransfer and perms.spares.add_stockrequest %}<th scope="col" class="no-export">Действия</th>{% endif %}
                 <th scope="col" data-export-only hidden>Остаток</th>
                 <th scope="col" data-export-only hidden>Ед. изм.</th>
                 <th scope="col" data-export-only hidden>Цена</th>
@@ -136,14 +136,14 @@
                     {% endif %}
                     {% if stock.plan %}<span class="d-block small text-secondary">План {{ stock.plan }}</span>{% endif %}
                   </td>
-                  {% if perms.spares.change_stock or perms.spares.add_writeoff or perms.spares.view_stockadjustment or perms.spares.add_inventorycount or perms.spares.view_inventorycount or perms.spares.add_stocktransfer %}
+                  {% if perms.spares.change_stock or perms.spares.add_writeoff and perms.spares.add_stockrequest or perms.spares.view_stockadjustment or perms.spares.add_inventorycount or perms.spares.view_inventorycount or perms.spares.add_stocktransfer and perms.spares.add_stockrequest %}
                     <td role="cell" class="stock-cell-actions">
                       <div class="stock-row-actions">
-                        {% if perms.spares.add_writeoff and stock.actual_balance > 0 %}
-                          <a class="btn btn-sm btn-outline-primary" href="{% url 'operations:writeoff_add' %}?stock={{ stock.pk }}">Списать</a>
+                        {% if perms.spares.add_writeoff and perms.spares.add_stockrequest and stock.actual_balance > 0 %}
+                          <a class="btn btn-sm btn-outline-primary" href="{% url 'operations:writeoff_add' %}?stock={{ stock.pk }}">{% if perms.spares.approve_stockrequest %}Списать{% else %}Заявка на списание{% endif %}</a>
                         {% endif %}
-                        {% if perms.spares.add_stocktransfer and stock.actual_balance > 0 %}
-                          <a class="btn btn-sm btn-outline-secondary" href="{% url 'transfers:add' %}?stock={{ stock.pk }}">Переместить</a>
+                        {% if perms.spares.add_stocktransfer and perms.spares.add_stockrequest and stock.actual_balance > 0 %}
+                          <a class="btn btn-sm btn-outline-secondary" href="{% url 'transfers:add' %}?stock={{ stock.pk }}">{% if perms.spares.approve_stockrequest %}Переместить{% else %}Заявка на перемещение{% endif %}</a>
                         {% endif %}
                         {% if perms.spares.change_stock %}
                           <a class="btn btn-sm btn-outline-secondary" href="{% url 'catalog:stock-edit' stock.pk %}">Скорректировать</a>

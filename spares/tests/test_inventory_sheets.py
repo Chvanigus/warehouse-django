@@ -54,9 +54,9 @@ class InventorySheetTests(TestCase):
             entries=[(self.first, Decimal('9.75')), (self.second, Decimal(second_quantity))],
         )
 
-    def open_form(self):
+    def open_form(self, actor=None):
         """Открывает ведомость нужного склада и возвращает параметры её отправки."""
-        self.client.force_login(self.operator)
+        self.client.force_login(actor or self.operator)
         url = reverse('inventory_sheets:add')
         response = self.client.get(url, {'warehouse': self.warehouse.pk})
         self.assertContains(response, 'Первый фильтр')
@@ -164,3 +164,24 @@ class InventorySheetTests(TestCase):
         result = self.client.post(reverse('inventory_sheets:approve', args=[sheet.pk]), {'decision': 'approve'})
         self.assertContains(result, 'Автор ведомости не может проверить её самостоятельно')
         self.assertFalse(StockAdjustment.objects.exists())
+
+    def test_reviewer_submits_and_applies_sheet_immediately(self):
+        """Проверяет проведение новой ведомости проверяющего и аудит расхождения."""
+        self.grant(self.controller, 'add_inventorysheet')
+        url, data = self.open_form(actor=self.controller)
+        result = self.client.post(url, data)
+        sheet = InventorySheet.objects.get()
+        self.assertRedirects(result, reverse('inventory_sheets:detail', args=[sheet.pk]))
+        self.assertEqual(sheet.status, InventorySheet.Status.APPROVED)
+        self.assertEqual((sheet.created_by_id, sheet.reviewed_by_id), (self.controller.pk, self.controller.pk))
+        self.assertEqual(StockAdjustment.objects.get().after, Decimal('9.75'))
+
+    def test_operator_cannot_read_other_pending_sheet(self):
+        """Скрывает чужие ожидающие ведомости от оператора до проведения."""
+        another = get_user_model().objects.create_user('other-operator')
+        sheet = submit_inventory_sheet(warehouse=self.warehouse, actor=another, entries=[(self.first, 8)])
+        self.client.force_login(self.operator)
+        url = reverse('inventory_sheets:detail', args=[sheet.pk])
+        self.assertEqual(self.client.get(url).status_code, 404)
+        self.client.force_login(self.controller)
+        self.assertEqual(self.client.get(url).status_code, 200)

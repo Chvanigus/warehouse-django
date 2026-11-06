@@ -9,16 +9,17 @@
         <p class="eyebrow mb-2">Складской учёт</p>
         <h1 id="dashboard-title">Склад запчастей</h1>
         <p class="dashboard-intro">Остатки по складам, поступления и списания в одном месте.</p>
-        {% if perms.spares.add_receipt or perms.spares.add_writeoff %}
+        {% if perms.spares.add_stockrequest %}
+          <p class="dashboard-intro mt-2">{% if perms.spares.approve_stockrequest %}Проверяйте заявки команды. Ваши операции проводятся сразу.{% else %}Создавайте заявки. Остатки обновятся после проверки.{% endif %}</p>
           <div class="dashboard-actions">
             {% if perms.spares.add_receipt %}
               <a class="btn btn-primary" href="{% url 'invoices:add' %}">
-                {% include 'include/icon.html' with name='in' only %} Оформить приход
+                {% include 'include/icon.html' with name='in' only %} {% if perms.spares.approve_stockrequest %}Оформить приход{% else %}Заявка на приход{% endif %}
               </a>
             {% endif %}
             {% if perms.spares.add_writeoff %}
               <a class="btn btn-outline-primary" href="{% url 'operations:writeoff_add' %}">
-                {% include 'include/icon.html' with name='out' only %} Списать запчасти
+                {% include 'include/icon.html' with name='out' only %} {% if perms.spares.approve_stockrequest %}Списать запчасти{% else %}Заявка на списание{% endif %}
               </a>
             {% endif %}
           </div>
@@ -26,6 +27,21 @@
       </div>
       <span class="dashboard-date">{% include 'include/icon.html' with name='calendar' only %} {{ today|date:"j E Y" }}</span>
     </section>
+
+    {% if perms.spares.view_stockrequest or perms.spares.manage_warehouse_users %}
+      <section class="workspace-panel dashboard-work" aria-labelledby="work-heading">
+        <h2 id="work-heading">{% if perms.spares.approve_stockrequest %}На проверке{% else %}Рабочие задачи{% endif %}</h2>
+        {% if perms.spares.view_stockrequest %}
+          <a href="{% url 'stock_requests:list' %}?status=pending">{% if perms.spares.approve_stockrequest %}Заявки{% else %}Мои заявки на проверке{% endif %} <span class="badge rounded-pill text-bg-light">{{ pending_stock_requests }}</span></a>
+        {% endif %}
+        {% if perms.spares.view_inventorysheet and perms.spares.approve_inventorysheet %}
+          <a href="{% url 'inventory_sheets:list' %}?status=pending">Ведомости <span class="badge rounded-pill text-bg-light">{{ pending_inventory_sheets }}</span></a>
+        {% endif %}
+        {% if perms.spares.manage_warehouse_users %}
+          <a href="{% url 'warehouse_admin:users' %}">Пользователи и роли</a>
+        {% endif %}
+      </section>
+    {% endif %}
 
     {% if perms.spares.view_stock or perms.spares.view_receipt or perms.spares.view_writeoff %}
       <div class="dashboard-stats">

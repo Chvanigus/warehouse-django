@@ -9,7 +9,9 @@ from django.utils.functional import cached_property
 from django.views.generic import ListView, TemplateView
 
 from spares.context_processors.income_outcome_report import get_income_report, get_outcome_report
+from spares.inventory_sheet_models import InventorySheet
 from spares.models import Receipt, Stock, WriteOff
+from spares.request_models import StockRequest
 from spares.report_forms import (
     AnnualReportFilterForm,
     ContractorsReportForm,
@@ -31,6 +33,15 @@ class WarehouseMainView(LoginRequiredMixin, TemplateView):
         today = timezone.localdate()
         month_start = today.replace(day=1)
         context['today'] = today
+        if user.has_perm('spares.view_stockrequest'):
+            pending = StockRequest.objects.filter(status=StockRequest.Status.PENDING)
+            if not user.has_perm('spares.approve_stockrequest'):
+                pending = pending.filter(created_by=user)
+            context['pending_stock_requests'] = pending.count()
+        if user.has_perms(('spares.view_inventorysheet', 'spares.approve_inventorysheet')):
+            context['pending_inventory_sheets'] = InventorySheet.objects.filter(
+                status=InventorySheet.Status.PENDING,
+            ).count()
         if user.has_perm('spares.view_stock'):
             context['stock_summary'] = Stock.objects.aggregate(
                 positions=Count('pk', filter=Q(actual_balance__gt=0)),

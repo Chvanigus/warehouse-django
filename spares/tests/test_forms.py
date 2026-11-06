@@ -4,6 +4,7 @@ from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
+from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.urls import reverse
 
@@ -12,6 +13,8 @@ from spares.models import (
     Company, Contractors, MachineWorker, Receipt, Spares, Stock, Warehouses,
     Workers, WriteOff,
 )
+from spares.request_models import StockRequest
+from spares.request_services import approve_stock_request
 
 
 class WarehouseOperationTests(TestCase):
@@ -39,7 +42,7 @@ class WarehouseOperationTests(TestCase):
         cls.operator = get_user_model().objects.create_user(username='operator')
         cls.operator.user_permissions.set(Permission.objects.filter(
             content_type__app_label='spares',
-            content_type__model__in=['receipt', 'writeoff', 'movement'],
+            content_type__model__in=['receipt', 'writeoff', 'movement', 'stockrequest'],
         ))
         cls.observer = get_user_model().objects.create_user(username='observer')
         cls.observer.user_permissions.add(Permission.objects.get(
@@ -52,6 +55,16 @@ class WarehouseOperationTests(TestCase):
         self.assertRedirects(response, reverse('operations:receipts'))
         return Receipt.objects.get()
 
+    def log_in_requester(self):
+        """Входит под сотрудником, который подаёт заявки на приход и списание."""
+        user = get_user_model().objects.create_user(username='requester')
+        user.user_permissions.add(*Permission.objects.filter(
+            content_type__app_label='spares',
+            codename__in=('add_receipt', 'add_writeoff', 'add_stockrequest', 'view_stockrequest'),
+        ))
+        self.client.force_login(user)
+        return user
+
     def test_permissions_separate_read_and_write_access(self):
         """Проверяет, что право просмотра прихода не даёт создавать документы."""
         receipt_list = reverse('operations:receipts')
@@ -62,6 +75,77 @@ class WarehouseOperationTests(TestCase):
         self.assertEqual(self.client.post(add_receipt, self.receipt_data).status_code, 403)
         self.assertEqual(self.client.get(reverse('operations:movements')).status_code, 403)
         self.assertFalse(Receipt.objects.exists())
+
+    def test_requester_receipt_stays_pending_until_review(self):
+        """Проверяет, что заявка на простой приход не меняет остаток до согласования."""
+        requester = self.log_in_requester()
+        response = self.client.post(reverse('operations:receipt_add'), self.receipt_data)
+        stock_request = StockRequest.objects.get()
+        self.assertRedirects(response, reverse('stock_requests:detail', args=[stock_request.pk]))
+        self.assertEqual((stock_request.status, stock_request.created_by), (StockRequest.Status.PENDING, requester))
+        self.assertFalse(Receipt.objects.exists())
+        self.assertFalse(Stock.objects.exists())
+
+        approved = approve_stock_request(stock_request.pk, actor=self.operator)
+        receipt = Receipt.objects.get()
+        self.assertEqual(approved.result['query'], {'entry': receipt.pk})
+        self.assertEqual(Stock.objects.get().actual_balance, Decimal('8.00'))
+
+    def test_requester_without_queue_view_returns_to_home(self):
+        """Проверяет доступную страницу после подачи заявки с правами добавления."""
+        requester = self.log_in_requester()
+        requester.user_permissions.remove(Permission.objects.get(
+            content_type__app_label='spares', codename='view_stockrequest',
+        ))
+        response = self.client.post(reverse('operations:receipt_add'), self.receipt_data)
+        self.assertRedirects(response, reverse('spares:warehouse_main'))
+        self.assertEqual(StockRequest.objects.get().status, StockRequest.Status.PENDING)
+        self.assertFalse(Receipt.objects.exists())
+
+    def test_review_rechecks_writeoff_after_stock_changes(self):
+        """Оставляет заявку ожидающей, если после подачи товара стало недостаточно."""
+        self.client.force_login(self.operator)
+        self.add_receipt()
+        stock = Stock.objects.get()
+        self.log_in_requester()
+        response = self.client.post(reverse('operations:writeoff_add'), {
+            'spares_list': stock.pk, 'machine_list': self.assignment.pk,
+            'date': self.receipt_data['date'], 'quantity': '5',
+        })
+        stock_request = StockRequest.objects.get(kind=StockRequest.Kind.WRITEOFF)
+        self.assertRedirects(response, reverse('stock_requests:detail', args=[stock_request.pk]))
+        self.assertFalse(WriteOff.objects.exists())
+        self.assertEqual(Stock.objects.get().actual_balance, Decimal('8.00'))
+        WriteOff.objects.create(
+            spare=self.spare, company=self.company, warehouse=self.warehouse, price=stock.price,
+            date=self.receipt_data['date'], quantity=4, worker=self.assignment.worker,
+        )
+
+        with self.assertRaisesMessage(ValidationError, 'Количество превышает доступный остаток'):
+            approve_stock_request(stock_request.pk, actor=self.operator)
+        stock_request.refresh_from_db()
+        self.assertEqual(stock_request.status, StockRequest.Status.PENDING)
+        self.assertEqual(Stock.objects.get().actual_balance, Decimal('4.00'))
+        self.assertEqual(WriteOff.objects.count(), 1)
+
+    def test_review_rejects_changed_assignment(self):
+        """Не подменяет выбранного получателя после редактирования назначения."""
+        self.client.force_login(self.operator)
+        self.add_receipt()
+        stock = Stock.objects.get()
+        self.log_in_requester()
+        self.client.post(reverse('operations:writeoff_add'), {
+            'spares_list': stock.pk, 'machine_list': self.assignment.pk,
+            'date': self.receipt_data['date'], 'quantity': '2',
+        })
+        stock_request = StockRequest.objects.get(kind=StockRequest.Kind.WRITEOFF)
+        replacement = Workers.objects.create(name='Новый получатель')
+        MachineWorker.objects.filter(pk=self.assignment.pk).update(worker=replacement)
+
+        with self.assertRaisesMessage(ValidationError, 'Назначение техники изменилось'):
+            approve_stock_request(stock_request.pk, actor=self.operator)
+        self.assertFalse(WriteOff.objects.exists())
+        self.assertEqual(Stock.objects.get().actual_balance, Decimal('8.00'))
 
     def test_journal_combines_text_search_and_dates(self):
         """Проверяет сочетание поиска и дат, ошибку периода и ссылку на отдельную запись."""

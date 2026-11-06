@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Складские заявки{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/operations.css' %}">{% endblock %}
+
+{% block content %}
+  <main class="workspace operation-workspace">
+    <div class="page-heading operation-heading">
+      <div>
+        <p class="eyebrow">Складские операции</p>
+        <h1>{% if perms.spares.approve_stockrequest %}Очередь заявок{% else %}Мои заявки{% endif %}</h1>
+        <p class="muted-copy">Приходы, списания и перемещения. Остатки меняются после проведения заявки.</p>
+      </div>
+      <div class="d-flex flex-wrap gap-2">
+        {% if perms.spares.add_stockrequest %}
+          {% if perms.spares.add_receipt %}<a class="btn btn-primary" href="{% url 'invoices:add' %}">Новый приход</a>{% endif %}
+          {% if perms.spares.add_writeoff %}<a class="btn btn-outline-secondary" href="{% url 'operations:writeoff_add' %}">Новое списание</a>{% endif %}
+          {% if perms.spares.add_stocktransfer %}<a class="btn btn-outline-secondary" href="{% url 'transfers:add' %}">Новое перемещение</a>{% endif %}
+        {% endif %}
+        {% if perms.spares.approve_stockrequest and perms.spares.view_inventorysheet %}
+          <a class="btn btn-outline-secondary" href="{% url 'inventory_sheets:list' %}?status=pending">Ведомости на проверке</a>
+        {% endif %}
+      </div>
+    </div>
+    <nav class="operation-nav" aria-label="Статус заявки">
+      {% for value, label in statuses %}
+        <a class="btn btn-sm {% if status == value %}btn-primary{% else %}btn-outline-secondary{% endif %}"
+           href="{% url 'stock_requests:list' %}?status={{ value }}"{% if status == value %} aria-current="page"{% endif %}>{{ label }}</a>
+      {% endfor %}
+    </nav>
+    {% if stock_requests %}
+      <div class="workspace-panel table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead>
+            <tr><th scope="col">Заявка</th><th scope="col">Операция</th><th scope="col">Дата и автор</th><th scope="col">Статус</th></tr>
+          </thead>
+          <tbody>
+            {% for stock_request in stock_requests %}
+              <tr>
+                <th scope="row">
+                  <a href="{% url 'stock_requests:detail' stock_request.pk %}">{{ stock_request.title }}</a>
+                  <span class="d-block small text-secondary fw-normal">№ {{ stock_request.pk }}</span>
+                </th>
+                <td>{{ stock_request.get_kind_display }}</td>
+                <td>{{ stock_request.created_at|date:"d.m.Y H:i" }}<span class="d-block small text-secondary">{{ stock_request.created_by_name }}</span></td>
+                <td>{% include 'spares/stock_requests/status.html' %}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% if is_paginated %}{% include 'spares/journal_pagination.html' with pagination_label='Страницы заявок' %}{% endif %}
+      </div>
+    {% else %}
+      <p class="workspace-panel p-4">Заявок с выбранным статусом пока нет.</p>
+    {% endif %}
+  </main>
+{% endblock %}

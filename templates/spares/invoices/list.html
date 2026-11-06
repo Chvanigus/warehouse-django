@@ -14,9 +14,9 @@
       </div>
       <div class="d-flex flex-wrap gap-2">
         <a class="btn btn-outline-secondary" href="{% url 'operations:receipts' %}">Все приходы</a>
-        {% if perms.spares.add_receipt %}
+        {% if perms.spares.add_receipt and perms.spares.add_stockrequest %}
           <a class="btn btn-outline-primary" href="{% url 'invoices:upload' %}">Импорт XLSX</a>
-          <a class="btn btn-primary" href="{% url 'invoices:add' %}">Новая накладная</a>
+          <a class="btn btn-primary" href="{% url 'invoices:add' %}">{% if perms.spares.approve_stockrequest %}Новая накладная{% else %}Подать заявку{% endif %}</a>
         {% endif %}
       </div>
     </div>

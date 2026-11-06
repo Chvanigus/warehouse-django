@@ -10,7 +10,13 @@
       <div>
         <p class="eyebrow">Импорт XLSX</p>
         <h1>Предпросмотр накладной</h1>
-        <p class="muted-copy">Проверьте данные перед тем, как они попадут в остатки.</p>
+        <p class="muted-copy">
+          {% if perms.spares.approve_stockrequest %}
+            Проверьте данные перед проведением накладной.
+          {% else %}
+            Проверьте данные и отправьте накладную на согласование.
+          {% endif %}
+        </p>
       </div>
     </div>
     <section class="workspace-panel operation-form-panel mb-3">
@@ -21,7 +27,9 @@
     <form method="post" action="{% url 'invoices:upload' %}" class="d-flex flex-wrap gap-2">
       {% csrf_token %}
       <input type="hidden" name="confirmation" value="{{ confirmation }}">
-      <button class="btn btn-primary" type="submit">Провести накладную</button>
+      <button class="btn btn-primary" type="submit">
+        {% if perms.spares.approve_stockrequest %}Провести накладную{% else %}Подать заявку{% endif %}
+      </button>
       <a class="btn btn-outline-secondary" href="{% url 'invoices:upload' %}">Загрузить другой файл</a>
     </form>
   </main>

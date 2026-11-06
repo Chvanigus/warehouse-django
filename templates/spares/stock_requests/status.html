@@ -1,0 +1,3 @@
+<span class="badge {% if stock_request.status == 'applied' %}text-bg-success{% elif stock_request.status == 'rejected' %}text-bg-danger{% else %}text-bg-warning{% endif %}">
+  {{ stock_request.get_status_display }}
+</span>

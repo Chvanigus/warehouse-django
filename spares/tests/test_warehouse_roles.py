@@ -11,6 +11,7 @@ from django.urls import reverse
 
 from spares.management.commands.configure_warehouse_roles import CONTROLLER_GROUP, OPERATOR_GROUP
 from spares.models import Company, Spares, Stock, Warehouses
+from spares.warehouse_roles import WAREHOUSE_ROLES
 
 
 class WarehouseRoleTests(TestCase):
@@ -21,6 +22,7 @@ class WarehouseRoleTests(TestCase):
         """Создаёт участников без прав админки и контрольную позицию склада."""
         cls.operator = get_user_model().objects.create_user('operator')
         cls.controller = get_user_model().objects.create_user('controller')
+        cls.administrator = get_user_model().objects.create_user('warehouse-admin')
         cls.stock = Stock.objects.create(
             company=Company.objects.create(name='Фирма'),
             warehouse=Warehouses.objects.create(name='Основной склад'),
@@ -29,12 +31,17 @@ class WarehouseRoleTests(TestCase):
 
     def test_standard_roles_allow_their_workflows(self):
         """Проверяет, какие действия каждой роли доступны через веб-интерфейс."""
-        call_command('configure_warehouse_roles', operator=['operator'], controller=['controller'], stdout=StringIO())
+        call_command(
+            'configure_warehouse_roles', operator=['operator'], controller=['controller'],
+            admin=['warehouse-admin'], stdout=StringIO(),
+        )
         edit_stock = reverse('catalog:stock-edit', args=[self.stock.pk])
 
         self.client.force_login(self.operator)
         self.assertEqual(self.client.get(reverse('invoices:add')).status_code, 200)
         self.assertEqual(self.client.get(reverse('inventory_sheets:add')).status_code, 200)
+        self.assertContains(self.client.get(reverse('spares:warehouse_main')), 'Мои заявки')
+        self.assertEqual(self.client.get(reverse('warehouse_admin:users')).status_code, 403)
         self.assertEqual(self.client.post(edit_stock, {'actual_balance': 50}).status_code, 403)
         self.assertFalse(self.operator.has_perm('spares.approve_inventorysheet'))
         self.assertFalse(self.operator.has_perm('spares.delete_receipt'))
@@ -43,10 +50,38 @@ class WarehouseRoleTests(TestCase):
         self.assertEqual(self.client.get(reverse('inventory_sheets:list')).status_code, 200)
         self.assertEqual(self.client.get(reverse('purchases:list')).status_code, 200)
         self.assertEqual(self.client.get(edit_stock).status_code, 200)
-        self.assertEqual(self.client.post(reverse('invoices:add'), {}).status_code, 403)
+        self.assertEqual(self.client.get(reverse('invoices:add')).status_code, 200)
+        self.assertContains(self.client.get(reverse('spares:warehouse_main')), 'На проверке')
+        self.assertEqual(self.client.get(reverse('warehouse_admin:users')).status_code, 403)
         self.assertTrue(self.controller.has_perm('spares.approve_inventorysheet'))
+        self.assertTrue(self.controller.has_perm('spares.approve_stockrequest'))
         self.assertTrue(self.controller.has_perm('spares.delete_receipt'))
         self.assertFalse(self.controller.is_staff)
+
+        self.client.force_login(self.administrator)
+        self.assertContains(self.client.get(reverse('spares:warehouse_main')), 'Пользователи и роли')
+        self.assertEqual(self.client.get(reverse('warehouse_admin:users')).status_code, 200)
+        self.assertTrue(self.administrator.has_perm('spares.approve_stockrequest'))
+        self.assertFalse(self.administrator.is_staff)
+
+    def test_operator_with_admin_site_access_cannot_post_operations(self):
+        """Проверяет запрет обхода очереди даже через форму добавления в Django Admin."""
+        call_command('configure_warehouse_roles', operator=['operator'], stdout=StringIO())
+        self.operator.is_staff = True
+        self.operator.save(update_fields=['is_staff'])
+        self.client.force_login(self.operator)
+        for url_name in ('admin:spares_receipt_add', 'admin:spares_writeoff_add'):
+            self.assertEqual(self.client.post(reverse(url_name)).status_code, 403)
+
+    def test_assigning_role_replaces_previous_warehouse_group(self):
+        """Проверяет смену роли с сохранением внешней группы существующей записи."""
+        external = Group.objects.create(name='Внешняя группа')
+        self.operator.groups.add(external)
+        call_command('configure_warehouse_roles', operator=['operator'], stdout=StringIO())
+        call_command('configure_warehouse_roles', controller=['operator'], stdout=StringIO())
+        self.assertSetEqual(
+            set(self.operator.groups.values_list('name', flat=True)), {external.name, WAREHOUSE_ROLES['reviewer']},
+        )
 
     def test_reapplying_role_policy_removes_unexpected_group_privileges(self):
         """Проверяет восстановление заданного набора разрешений при повторной настройке."""

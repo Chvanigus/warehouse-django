@@ -10,7 +10,7 @@
       <div>
         <p class="eyebrow">Инвентаризация</p>
         <h1>Новая инвентаризационная ведомость</h1>
-        <p class="muted-copy">Запишите фактические количества за один обход склада и передайте их на проверку.</p>
+        <p class="muted-copy">{% if perms.spares.approve_inventorysheet %}Запишите фактические количества. После проведения расхождения сразу изменят учётный остаток.{% else %}Запишите фактические количества. Остатки изменятся после подтверждения ведомости.{% endif %}</p>
       </div>
       {% if perms.spares.view_inventorysheet %}
         <a class="btn btn-outline-secondary" href="{% url 'inventory_sheets:list' %}">К ведомостям</a>
@@ -50,7 +50,7 @@
         </template>
         <div class="d-flex flex-wrap gap-2 mt-3">
           <button class="btn btn-outline-secondary" type="button" data-add-line>Добавить позицию</button>
-          <button class="btn btn-primary" type="submit">Передать на проверку</button>
+          <button class="btn btn-primary" type="submit">{% if perms.spares.approve_inventorysheet %}Провести ведомость{% else %}Передать на проверку{% endif %}</button>
         </div>
       </form>
     {% elif warehouse %}

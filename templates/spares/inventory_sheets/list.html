@@ -10,7 +10,7 @@
       <div>
         <p class="eyebrow">Инвентаризация</p>
         <h1>Инвентаризационные ведомости</h1>
-        <p class="muted-copy">Пересчёты по складам и решения контролёров.</p>
+        <p class="muted-copy">Пересчёты по складам и решения проверяющих.</p>
       </div>
       <div class="d-flex flex-wrap gap-2">
         {% if perms.spares.view_inventorycount %}
@@ -21,6 +21,12 @@
         {% endif %}
       </div>
     </div>
+    <nav class="operation-nav" aria-label="Статус ведомости">
+      <a class="btn btn-sm {% if not request.GET.status %}btn-primary{% else %}btn-outline-secondary{% endif %}" href="{% url 'inventory_sheets:list' %}">Все</a>
+      {% for value, label in status_choices %}
+        <a class="btn btn-sm {% if request.GET.status == value %}btn-primary{% else %}btn-outline-secondary{% endif %}" href="{% url 'inventory_sheets:list' %}?status={{ value }}">{{ label }}</a>
+      {% endfor %}
+    </nav>
     {% if sheets %}
       <div class="workspace-panel table-responsive">
         <table class="table table-hover align-middle mb-0">

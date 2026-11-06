@@ -1,5 +1,5 @@
 <header class="warehouse-header" data-bs-theme="dark">
-  <nav class="navbar navbar-expand-lg" aria-label="Главное меню">
+  <nav class="navbar navbar-expand-xl" aria-label="Главное меню">
     <div class="workspace">
       <a class="navbar-brand warehouse-brand" href="{% url 'spares:warehouse_main' %}">
         <span class="brand-mark">{% include 'include/icon.html' with name='box' only %}</span>
@@ -17,6 +17,13 @@
                 <a class="nav-link{% if route == 'warehouse_main' %} active{% endif %}" href="{% url 'spares:warehouse_main' %}"
                    {% if route == 'warehouse_main' %}aria-current="page"{% endif %}>Обзор</a>
               </li>
+              {% if perms.spares.view_stockrequest %}
+                <li class="nav-item">
+                  <a class="nav-link{% if section == 'stock_requests' %} active{% endif %}"
+                     href="{% url 'stock_requests:list' %}{% if perms.spares.approve_stockrequest %}?status=pending{% endif %}"
+                     {% if section == 'stock_requests' and route == 'list' %}aria-current="page"{% endif %}>{% if perms.spares.approve_stockrequest %}На проверку{% else %}Мои заявки{% endif %}</a>
+                </li>
+              {% endif %}
               {% if perms.spares.view_stock %}
                 <li class="nav-item">
                   <a class="nav-link{% if route == 'stock_report' or route == 'stock_card' or route == 'stock-edit' or route == 'stock-add' or route == 'stock_adjustments' %} active{% endif %}"
@@ -39,6 +46,12 @@
                 <li class="nav-item">
                   <a class="nav-link{% if route == 'analytics' or route == 'turnover' or 'report' in route and route != 'stock_report' %} active{% endif %}"
                      href="{% url 'spares:analytics' %}" {% if route == 'analytics' %}aria-current="page"{% endif %}>Аналитика</a>
+                </li>
+              {% endif %}
+              {% if perms.spares.manage_warehouse_users %}
+                <li class="nav-item">
+                  <a class="nav-link{% if section == 'warehouse_admin' %} active{% endif %}"
+                     href="{% url 'warehouse_admin:users' %}" {% if section == 'warehouse_admin' %}aria-current="page"{% endif %}>Управление</a>
                 </li>
               {% endif %}
               <li class="nav-item dropdown">
@@ -72,7 +85,12 @@
             </ul>
           {% endwith %}
           <div class="warehouse-account">
-            <span class="account-name" title="{{ user.get_username }}">{{ user.get_username }}</span>
+            <div class="account-identity">
+              <span class="account-name" title="{{ user.get_username }}">{{ user.get_short_name|default:user.get_username }}</span>
+              {% if perms.spares.manage_warehouse_users %}<span class="account-role">Администратор</span>
+              {% elif perms.spares.approve_stockrequest %}<span class="account-role">Проверяющий</span>
+              {% elif perms.spares.add_stockrequest %}<span class="account-role">Оператор</span>{% endif %}
+            </div>
             <form method="post" action="{% url 'spares:logout' %}">
               {% csrf_token %}
               <button class="btn btn-outline-light btn-sm" type="submit">Выйти</button>

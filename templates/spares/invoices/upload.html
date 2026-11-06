@@ -10,12 +10,12 @@
       <div>
         <p class="eyebrow">Приход</p>
         <h1>Импорт накладной из XLSX</h1>
-        <p class="muted-copy">Проверьте позиции в предпросмотре перед проведением.</p>
+        <p class="muted-copy">Проверьте позиции в предпросмотре перед {% if perms.spares.approve_stockrequest %}проведением{% else %}подачей заявки{% endif %}.</p>
       </div>
       <a class="btn btn-outline-secondary" href="{% url 'invoices:add' %}">Заполнить вручную</a>
     </div>
     {% if confirmation_failed %}
-      <div class="alert alert-warning" role="alert">Накладная не проведена. Проверьте реквизиты и загрузите файл заново.</div>
+      <div class="alert alert-warning" role="alert">Проверьте реквизиты и загрузите файл заново.</div>
     {% endif %}
     <form class="workspace-panel operation-form-panel" method="post" enctype="multipart/form-data">
       {% csrf_token %}

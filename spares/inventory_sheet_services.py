@@ -25,7 +25,7 @@ def _lock_stocks(stock_ids):
 
 @transaction.atomic
 def submit_inventory_sheet(*, warehouse, actor, entries, note='', expected_versions=None):
-    """Проверить позиции и сохранить ведомость со снимками без изменения текущих остатков."""
+    """Сохранить ведомость со снимками и сразу провести её, если автор вправе проверять."""
     require_operation_actor(actor, 'Для операции нужен автор.')
     entries = list(entries)
     if not 1 <= len(entries) <= MAX_SHEET_LINES:
@@ -51,6 +51,8 @@ def submit_inventory_sheet(*, warehouse, actor, entries, note='', expected_versi
             update_summary=False,
         )
         InventorySheetLine.objects.create(sheet=sheet, count=count, stock_revision=stock_version(current))
+    if actor.has_perm('spares.approve_inventorysheet'):
+        return _record_review(sheet, actor=actor, approve=True, note='Проведена при создании проверяющим.')
     return sheet
 
 
@@ -86,18 +88,8 @@ def _apply_sheet_counts(sheet, actor):
             line.save(update_fields=['adjustment'])
 
 
-@transaction.atomic
-def review_inventory_sheet(sheet, *, actor, approve, note=''):
-    """Подтвердить или отклонить ведомость одним контролёром в одной транзакции."""
-    require_operation_actor(actor, 'Для операции нужен автор.')
-    try:
-        sheet = InventorySheet.objects.select_for_update().get(pk=sheet.pk)
-    except InventorySheet.DoesNotExist as error:
-        raise ValidationError('Ведомость отсутствует.') from error
-    if sheet.status != InventorySheet.Status.PENDING:
-        raise ValidationError('Ведомость уже проверена.')
-    if sheet.created_by_id == actor.pk:
-        raise ValidationError('Автор ведомости не может проверить её самостоятельно.')
+def _record_review(sheet, *, actor, approve, note):
+    """Записать решение и, при подтверждении, провести пересчёты в текущей транзакции."""
     note = InventorySheet._meta.get_field('review_note').clean((note or '').strip(), None)
     if not approve and not note:
         raise ValidationError('Укажите причину отклонения.')
@@ -112,3 +104,20 @@ def review_inventory_sheet(sheet, *, actor, approve, note=''):
     sheet.review_note = note
     sheet.save(update_fields=['status', 'reviewed_by', 'reviewed_by_name', 'reviewed_at', 'review_note'])
     return sheet
+
+
+@transaction.atomic
+def review_inventory_sheet(sheet, *, actor, approve, note=''):
+    """Заблокировать ожидающую ведомость и принять решение другого проверяющего."""
+    require_operation_actor(actor, 'Для операции нужен автор.')
+    if not actor.has_perm('spares.approve_inventorysheet'):
+        raise ValidationError('У вас нет права проверять ведомости.')
+    try:
+        sheet = InventorySheet.objects.select_for_update().get(pk=sheet.pk)
+    except InventorySheet.DoesNotExist as error:
+        raise ValidationError('Ведомость отсутствует.') from error
+    if sheet.status != InventorySheet.Status.PENDING:
+        raise ValidationError('Ведомость уже проверена.')
+    if sheet.created_by_id == actor.pk:
+        raise ValidationError('Автор ведомости не может проверить её самостоятельно.')
+    return _record_review(sheet, actor=actor, approve=approve, note=note)

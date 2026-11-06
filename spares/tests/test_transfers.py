@@ -12,6 +12,8 @@ from django.urls import reverse
 from django.utils import timezone
 
 from spares.models import Company, Contractors, MeasureMeasurement, Movement, Receipt, Spares, Stock, Warehouses
+from spares.request_models import StockRequest
+from spares.request_services import approve_stock_request
 from spares.transfer_models import StockTransfer, cancel_transfer, post_transfer
 
 
@@ -47,9 +49,9 @@ class TransferTests(TestCase):
         return Stock.objects.filter(warehouse=self.destination, spare=self.spare)
 
     def grant(self, *codenames):
-        """Добавляет пользователю указанные разрешения модели перемещения."""
+        """Добавляет пользователю указанные разрешения склада."""
         self.actor.user_permissions.add(*Permission.objects.filter(
-            content_type__app_label='spares', content_type__model='stocktransfer', codename__in=codenames,
+            content_type__app_label='spares', codename__in=codenames,
         ))
 
     def test_transfer_preserves_receipt_and_merges_only_matching_identity(self):
@@ -161,6 +163,8 @@ class TransferTests(TestCase):
         self.assertEqual(self.client.post(add_url, data).status_code, 403)
 
         self.grant('add_stocktransfer')
+        self.assertNotContains(self.client.get(list_url), add_url)
+        self.grant('add_stockrequest', 'approve_stockrequest')
         form = self.client.get(add_url, {'stock': self.source.pk}).context['form']
         self.assertEqual(form.initial['source'], self.source.pk)
         response = self.client.post(add_url, data)
@@ -170,3 +174,30 @@ class TransferTests(TestCase):
         self.assertContains(self.client.get(detail), 'Для ремонта')
         self.assertContains(self.client.get(list_url, {'q': 'подшипник'}), 'Мастерская')
         self.assertEqual(self.client.post(detail, data).status_code, 405)
+
+    def test_operator_transfer_waits_for_review_and_preserves_actor(self):
+        """Перемещает запас только после решения другого сотрудника и сохраняет его авторство."""
+        self.client.force_login(self.actor)
+        self.grant('add_stocktransfer', 'add_stockrequest', 'view_stockrequest')
+        response = self.client.post(reverse('transfers:add'), {
+            'source': self.source.pk, 'destination': self.destination.pk, 'quantity': '2.50',
+            'date': timezone.localdate().isoformat(), 'note': 'Для заявки',
+        })
+        stock_request = StockRequest.objects.get()
+        self.assertRedirects(response, reverse('stock_requests:detail', args=[stock_request.pk]))
+        self.assertEqual(stock_request.status, StockRequest.Status.PENDING)
+        self.source.refresh_from_db()
+        self.assertEqual(self.source.actual_balance, 10)
+        self.assertFalse(self.destination_stocks().exists())
+
+        reviewer = get_user_model().objects.create_user('transfer-reviewer')
+        reviewer.user_permissions.add(Permission.objects.get(
+            content_type__app_label='spares', codename='approve_stockrequest',
+        ))
+        approve_stock_request(stock_request.pk, actor=reviewer)
+        transfer = StockTransfer.objects.get()
+        self.assertEqual(transfer.actor, reviewer)
+        self.assertEqual(stock_request.created_by, self.actor)
+        self.source.refresh_from_db()
+        self.assertEqual(self.source.actual_balance, Decimal('7.50'))
+        self.assertEqual(self.destination_stocks().get().actual_balance, Decimal('2.50'))

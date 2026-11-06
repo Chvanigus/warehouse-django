@@ -4,15 +4,19 @@ from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.core.exceptions import ValidationError
 from django.http import HttpResponseRedirect
+from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils.functional import cached_property
 from django.views.generic import DeleteView, DetailView, FormView, ListView
 
 from .forms import JournalFilterForm
 from .models import Stock
-from .operation_views import OperationCancellationForm
+from .operation_views import OperationCancellationForm, redirect_to_pending_request
+from .request_models import StockRequest
+from .request_operations import serialize_form_data
+from .request_services import submit_stock_request
 from .transfer_forms import TransferForm
-from .transfer_models import StockTransfer, cancel_transfer, post_transfer
+from .transfer_models import StockTransfer, cancel_transfer
 
 
 class TransferReadMixin(LoginRequiredMixin, PermissionRequiredMixin):
@@ -75,8 +79,8 @@ class TransferCancelView(TransferReadMixin, DeleteView):
 
 
 class TransferCreateView(LoginRequiredMixin, PermissionRequiredMixin, FormView):
-    """Проводит перемещение по валидной форме и сообщает его номер."""
-    permission_required = 'spares.add_stocktransfer'
+    """Принимает заявку на перемещение или сразу проводит его по правам автора."""
+    permission_required = ('spares.add_stocktransfer', 'spares.add_stockrequest')
     template_name = 'spares/transfers/form.html'
     form_class = TransferForm
 
@@ -91,17 +95,22 @@ class TransferCreateView(LoginRequiredMixin, PermissionRequiredMixin, FormView):
         return initial
 
     def form_valid(self, form):
-        """Передаёт данные в сервис перемещений и показывает результат проведения."""
+        """Сохраняет заявку и открывает её или проведённое перемещение."""
         try:
-            self.transfer = post_transfer(actor=self.request.user, **form.cleaned_data)
+            stock_request = submit_stock_request(
+                StockRequest.Kind.TRANSFER, serialize_form_data(form.cleaned_data),
+                actor=self.request.user, title=f'Перемещение · {form.cleaned_data["source"].spare}',
+            )
         except ValidationError as error:
-            form.add_error(None, ValidationError(error.messages))
+            form.add_error(None, error)
             return self.form_invalid(form)
-        messages.success(self.request, f'Перемещение № {self.transfer.pk} проведено.')
-        return super().form_valid(form)
-
-    def get_success_url(self):
-        """Открывает проведённый документ или главную страницу согласно правам."""
+        if stock_request.status == StockRequest.Status.PENDING:
+            destination = (
+                'transfers:list' if self.request.user.has_perm('spares.view_stocktransfer') else 'spares:warehouse_main'
+            )
+            return redirect_to_pending_request(self.request, stock_request, reverse(destination))
+        transfer_id = stock_request.result['pk']
+        messages.success(self.request, f'Перемещение № {transfer_id} проведено.')
         if self.request.user.has_perm('spares.view_stocktransfer'):
-            return reverse('transfers:detail', args=[self.transfer.pk])
-        return reverse('spares:warehouse_main')
+            return redirect('transfers:detail', pk=transfer_id)
+        return redirect('spares:warehouse_main')

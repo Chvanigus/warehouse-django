@@ -1,15 +1,17 @@
 """Страницы накладных, загрузки XLSX, подтверждения проведения и отмены."""
 
 from decimal import Decimal, ROUND_HALF_UP
+from hashlib import sha256
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.core import signing
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError
+from django.db import transaction
 from django.db.models import Count, Prefetch, Sum
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils.functional import cached_property
 from django.views import View
 from django.views.generic import DetailView, ListView
@@ -17,9 +19,13 @@ from django.views.generic import DetailView, ListView
 from .forms import JournalFilterForm
 from .invoice_forms import InvoiceCancelForm, InvoiceHeaderForm, InvoiceLineForm, InvoiceLineFormSet, InvoiceUploadForm
 from .invoice_models import ReceiptInvoice
-from .invoice_services import cancel_receipt_invoice, invoice_version, post_receipt_invoice
+from .invoice_services import cancel_receipt_invoice, invoice_version
 from .invoice_xlsx import make_invoice_workbook, read_invoice_workbook
 from .models import Receipt
+from .operation_views import redirect_to_pending_request
+from .request_models import StockRequest
+from .request_operations import serialize_form_data
+from .request_services import submit_stock_request
 
 
 HEADER_FIELDS = tuple(InvoiceHeaderForm.base_fields)
@@ -32,15 +38,8 @@ def _prepare_preview(actor, header, lines):
     return signing.dumps({
         'user': str(actor.pk),
         'version': invoice_version(header, ReceiptInvoice.normalize_number(header['number'])),
-        'header': {
-            'number': header['number'], 'date': header['date'].isoformat(),
-            'company': header['company'].pk, 'contractor': header['contractor'].pk,
-            'warehouse': header['warehouse'].pk,
-        },
-        'lines': [{
-            'spare': line['spare'].pk, 'measure': line['measure'].pk if line['measure'] else '',
-            'quantity': str(line['quantity']), 'price': str(line['price']),
-        } for line in lines],
+        'header': serialize_form_data(header),
+        'lines': [serialize_form_data(line) for line in lines],
     }, salt=PREVIEW_SALT, compress=True)
 
 
@@ -50,26 +49,42 @@ def _header_values(form):
 
 
 class InvoicePermissionMixin(LoginRequiredMixin, PermissionRequiredMixin):
-    """Подключает проверку прав и общий сценарий проведения накладной."""
-    def redirect_after_posting(self, invoice):
+    """Подключает проверку прав и общий сценарий подачи накладной."""
+    def redirect_after_posting(self, invoice_id):
         """Открывает проведённую накладную или главную страницу согласно правам."""
         if self.request.user.has_perm('spares.view_receipt'):
-            return redirect('invoices:detail', pk=invoice.pk)
+            return redirect('invoices:detail', pk=invoice_id)
         return redirect('spares:warehouse_main')
 
-    def post_invoice(self, header, lines, error_form, *, preview_version=None):
-        """Передаёт накладную в сервис проведения и возвращает ошибки в форму."""
+    def post_invoice(self, header, lines, error_form, *, preview_version=None, preview_key=None):
+        """Подаёт накладную и защищает предпросмотр XLSX от повторной отправки."""
+        payload = {'header': serialize_form_data(header), 'lines': [serialize_form_data(line) for line in lines]}
+        if preview_version is not None:
+            payload.update(preview_version=preview_version, preview_key=preview_key)
         try:
-            invoice = post_receipt_invoice(
-                actor=self.request.user, header=header, lines=lines, preview_version=preview_version,
-            )
+            with transaction.atomic():
+                if preview_version is not None:
+                    number_key = ReceiptInvoice.normalize_number(header['number'])
+                    if invoice_version(header, number_key) != preview_version:
+                        raise ValidationError(
+                            'История этой накладной изменилась. Загрузите файл для нового предпросмотра.',
+                        )
+                    if StockRequest.objects.filter(
+                        kind=StockRequest.Kind.RECEIPT_INVOICE, payload__preview_key=preview_key,
+                    ).exists():
+                        raise ValidationError('Заявка по этому предпросмотру уже существует.')
+                stock_request = submit_stock_request(
+                    StockRequest.Kind.RECEIPT_INVOICE, payload, actor=self.request.user,
+                    title=f'Накладная № {header["number"]}',
+                )
         except ValidationError as error:
             error_form.add_error(None, error)
-        except IntegrityError:
-            error_form.add_error(None, 'Накладная не проведена. Проверьте номер и справочники и повторите попытку.')
         else:
+            if stock_request.status == StockRequest.Status.PENDING:
+                destination = 'invoices:list' if self.request.user.has_perm('spares.view_receipt') else 'spares:warehouse_main'
+                return redirect_to_pending_request(self.request, stock_request, reverse(destination))
             messages.success(self.request, 'Накладная проведена.')
-            return self.redirect_after_posting(invoice)
+            return self.redirect_after_posting(stock_request.result['pk'])
         return None
 
 
@@ -109,7 +124,7 @@ class InvoiceDetailView(InvoicePermissionMixin, DetailView):
 
 class InvoiceAddView(InvoicePermissionMixin, View):
     """Принимает накладную, заполненную вручную на сайте."""
-    permission_required = 'spares.add_receipt'
+    permission_required = ('spares.add_receipt', 'spares.add_stockrequest')
     template_name = 'spares/invoices/add.html'
 
     def get(self, request):
@@ -117,7 +132,7 @@ class InvoiceAddView(InvoicePermissionMixin, View):
         return render(request, self.template_name, {'form': InvoiceHeaderForm(), 'lines': InvoiceLineFormSet()})
 
     def post(self, request):
-        """Проверяет реквизиты и строки, затем пытается провести накладную."""
+        """Проверяет реквизиты и строки, затем подаёт накладную."""
         form, lines = InvoiceHeaderForm(request.POST), InvoiceLineFormSet(request.POST)
         header_valid = form.is_valid()
         lines_valid = lines.is_valid()
@@ -130,7 +145,7 @@ class InvoiceAddView(InvoicePermissionMixin, View):
 
 class InvoiceUploadView(InvoicePermissionMixin, View):
     """Обрабатывает загрузку файла, предпросмотр и подтверждение накладной."""
-    permission_required = 'spares.add_receipt'
+    permission_required = ('spares.add_receipt', 'spares.add_stockrequest')
     template_name = 'spares/invoices/upload.html'
 
     def get(self, request):
@@ -164,23 +179,25 @@ class InvoiceUploadView(InvoicePermissionMixin, View):
         })
 
     def confirm(self, request):
-        """Проверяет срок подписи и автора, повторно валидирует данные и проводит накладную."""
+        """Проверяет срок подписи и автора, валидирует данные и подаёт накладную."""
+        confirmation = request.POST['confirmation']
         try:
-            payload = signing.loads(request.POST['confirmation'], salt=PREVIEW_SALT, max_age=PREVIEW_MAX_AGE)
+            payload = signing.loads(confirmation, salt=PREVIEW_SALT, max_age=PREVIEW_MAX_AGE)
             if payload['user'] != str(request.user.pk):
                 raise signing.BadSignature
-        except (signing.BadSignature, ValueError, KeyError):
+            form = InvoiceHeaderForm(payload['header'])
+            lines = [InvoiceLineForm(line) for line in payload['lines']]
+        except (signing.BadSignature, ValueError, KeyError, TypeError):
             messages.error(request, 'Предпросмотр недействителен. Загрузите файл заново.')
             return redirect('invoices:upload')
 
-        form = InvoiceHeaderForm(payload['header'])
-        lines = [InvoiceLineForm(line) for line in payload['lines']]
         header_valid = form.is_valid()
         lines_valid = all(line.is_valid() for line in lines)
         if header_valid and lines_valid:
             response = self.post_invoice(
                 _header_values(form), [line.cleaned_data for line in lines], form,
                 preview_version=payload.get('version', -1),
+                preview_key=sha256(confirmation.encode()).hexdigest(),
             )
             if response:
                 return response

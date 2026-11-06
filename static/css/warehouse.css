@@ -109,12 +109,15 @@ main.workspace { padding-block: clamp(1.25rem, 3.5vw, 2.5rem); }
   gap: .8rem;
   padding-left: 1rem;
 }
+.account-identity { display: grid; min-width: 0; }
 .account-name {
   font-size: .85rem;
-  max-width: min(14rem, 50vw);
+  max-width: min(10rem, 50vw);
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
+.account-role { color: #b6cee8; font-size: .72rem; }
 
 .btn-primary {
   --bs-btn-bg: var(--warehouse-blue);
@@ -196,6 +199,16 @@ main.workspace { padding-block: clamp(1.25rem, 3.5vw, 2.5rem); }
 }
 .dashboard-actions .btn { font-weight: 600; padding: .55rem .85rem; }
 .dashboard-actions .btn .ui-icon { margin-right: .22rem; }
+.dashboard-work {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: .75rem 1.75rem;
+  margin-bottom: 1rem;
+  padding: .9rem 1.15rem;
+}
+.dashboard-work h2 { font-size: 1rem; margin: 0; }
+.dashboard-work a { align-items: center; display: inline-flex; gap: .4rem; }
 .dashboard-date {
   align-items: center;
   background: rgb(255 255 255 / .78);
@@ -274,11 +287,11 @@ main.workspace { padding-block: clamp(1.25rem, 3.5vw, 2.5rem); }
 .warehouse-login { max-width: 29rem; }
 .warehouse-login .workspace-panel { padding: clamp(1.25rem, 4vw, 2rem); }
 
-@media (min-width: 992px) {
+@media (min-width: 1200px) {
   .warehouse-header .navbar > .workspace { flex-wrap: nowrap; }
 }
 
-@media (max-width: 991.98px) {
+@media (max-width: 1199.98px) {
   .warehouse-nav-links { padding-top: .75rem; }
   .warehouse-account { padding: .75rem 0 .25rem; }
 }

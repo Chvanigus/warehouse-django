@@ -15,6 +15,9 @@
         <p class="eyebrow mb-2">Складские операции</p>
         <h1>Переместить запчасти</h1>
         <p class="muted-copy mb-0">Укажите исходную позицию, склад назначения и количество.</p>
+        {% if not perms.spares.approve_stockrequest %}
+          <p class="muted-copy mb-0">Согласующий проверит заявку и проведёт перемещение.</p>
+        {% endif %}
       </div>
     </div>
     <form method="post" class="workspace-panel operation-form-panel col-12 col-lg-8">
@@ -32,7 +35,9 @@
       <div class="operation-form-footer">
         <p class="muted-copy"><span class="operation-required" aria-hidden="true">*</span> Обязательные поля</p>
         <div class="operation-form-actions">
-          <button type="submit" class="btn btn-primary">Провести перемещение</button>
+          <button type="submit" class="btn btn-primary">
+            {% if perms.spares.approve_stockrequest %}Провести перемещение{% else %}Подать заявку{% endif %}
+          </button>
           {% if perms.spares.view_stocktransfer %}
             <a href="{% url 'transfers:list' %}" class="btn btn-outline-secondary">Отмена</a>
           {% elif perms.spares.view_stock %}

@@ -26,6 +26,9 @@
 
     <form method="post" data-operation-form="{{ operation_name }}">
       {% csrf_token %}
+      {% if not perms.spares.approve_stockrequest %}
+        <p class="muted-copy">Согласующий проверит заявку и проведёт операцию.</p>
+      {% endif %}
       {% if form.non_field_errors %}
         <div class="alert alert-danger" role="alert">{{ form.non_field_errors }}</div>
       {% endif %}
@@ -90,7 +93,7 @@
             Количество больше доступного остатка.
           </p>
           {% if operation_name == 'writeoff' %}
-            <p class="muted-copy">При сохранении остаток проверяется ещё раз.</p>
+              <p class="muted-copy">Остаток проверяется повторно при проведении.</p>
           {% else %}
             <p class="muted-copy">Сумма рассчитывается из количества и цены за единицу.</p>
           {% endif %}
@@ -101,7 +104,7 @@
         <p class="muted-copy"><span class="operation-required" aria-hidden="true">*</span> Обязательные поля</p>
         <div class="operation-form-actions">
           <button type="submit" class="btn btn-primary">
-            {% if object %}Сохранить изменения{% elif operation_name == 'receipt' %}Сохранить приход{% else %}Сохранить списание{% endif %}
+            {% if not perms.spares.approve_stockrequest %}Подать заявку{% elif object %}Сохранить изменения{% elif operation_name == 'receipt' %}Сохранить приход{% else %}Сохранить списание{% endif %}
           </button>
           <a href="{{ list_url }}" class="btn btn-outline-secondary">Отмена</a>
         </div>

@@ -11,6 +11,9 @@
         <p class="eyebrow">Приход</p>
         <h1>Новая накладная</h1>
         <p class="muted-copy">Заполните общие реквизиты поставки и добавьте все позиции.</p>
+        {% if not perms.spares.approve_stockrequest %}
+          <p class="muted-copy mb-0">Согласующий проверит заявку и проведёт накладную.</p>
+        {% endif %}
       </div>
       <div class="d-flex flex-wrap gap-2">
         <a class="btn btn-outline-primary" href="{% url 'invoices:upload' %}">Загрузить XLSX</a>
@@ -37,7 +40,9 @@
       </template>
       <div class="d-flex flex-wrap gap-2 mt-3">
         <button class="btn btn-outline-secondary" type="button" data-add-line>Добавить позицию</button>
-        <button class="btn btn-primary" type="submit">Провести накладную</button>
+        <button class="btn btn-primary" type="submit">
+          {% if perms.spares.approve_stockrequest %}Провести накладную{% else %}Подать заявку{% endif %}
+        </button>
       </div>
     </form>
   </main>
