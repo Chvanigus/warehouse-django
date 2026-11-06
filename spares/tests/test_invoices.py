@@ -3,6 +3,7 @@
 from datetime import timedelta
 from decimal import Decimal
 from io import BytesIO
+from zipfile import ZIP_DEFLATED, ZipFile
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
@@ -117,6 +118,18 @@ class InvoiceWorkflowTests(TestCase):
         self.assertEqual(invoice.lines.filter(cancelled_at__isnull=True).count(), 2)
         self.assertEqual(Stock.objects.get(spare=self.first).actual_balance, Decimal('2.50'))
 
+    def test_invoice_line_with_overflow_shows_validation_error(self):
+        """Проверяет ошибку формы при допустимых цене и количестве с недопустимой суммой."""
+        data = self.line_data()
+        data.update({'form-0-price': '9999999999999.99', 'form-0-quantity': '9999999999999.99'})
+
+        response = self.client.post(reverse('invoices:add'), data)
+
+        self.assertContains(response, 'Сумма строки превышает допустимое значение.')
+        self.assertFalse(ReceiptInvoice.objects.exists())
+        self.assertFalse(StockRequest.objects.exists())
+        self.assertFalse(Stock.objects.exists())
+
     def test_future_date_and_duplicate_legacy_number_are_rejected(self):
         """Проверяет запрет будущей даты и повторного номера исторического прихода."""
         add = reverse('invoices:add')
@@ -161,6 +174,23 @@ class InvoiceWorkflowTests(TestCase):
                 response = self.client.post(upload, {**self.header, 'workbook': self.workbook(rows)})
                 self.assertContains(response, error)
         self.assertFalse(Stock.objects.exists())
+
+    def test_invalid_xlsx_compression_shows_validation_error(self):
+        """Возвращает ошибку загрузки при повреждённом потоке сжатия XLSX."""
+        file = BytesIO()
+        content_types = '[Content_Types].xml'
+        with ZipFile(file, 'w', compression=ZIP_DEFLATED) as archive:
+            archive.writestr(content_types, '<Types/>')
+            archive.writestr('xl/workbook.xml', '<workbook/>')
+        damaged = bytearray(file.getvalue())
+        # Подменяем тип блока DEFLATE на зарезервированный после заголовка и имени файла.
+        damaged[30 + len(content_types)] = 0x07
+        upload = SimpleUploadedFile('invoice.xlsx', bytes(damaged))
+
+        response = self.client.post(reverse('invoices:upload'), {**self.header, 'workbook': upload})
+
+        self.assertContains(response, 'Не удалось прочитать файл XLSX.')
+        self.assertFalse(StockRequest.objects.exists())
 
     def test_import_requires_receipt_permission_and_template_is_xlsx(self):
         """Проверяет права импорта и формат загружаемого шаблона."""

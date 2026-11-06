@@ -18,7 +18,7 @@
           {% if perms.spares.add_writeoff %}<a class="btn btn-outline-secondary" href="{% url 'operations:writeoff_add' %}">Новое списание</a>{% endif %}
           {% if perms.spares.add_stocktransfer %}<a class="btn btn-outline-secondary" href="{% url 'transfers:add' %}">Новое перемещение</a>{% endif %}
         {% endif %}
-        {% if perms.spares.approve_stockrequest and perms.spares.view_inventorysheet %}
+        {% if perms.spares.approve_inventorysheet and perms.spares.view_inventorysheet %}
           <a class="btn btn-outline-secondary" href="{% url 'inventory_sheets:list' %}?status=pending">Ведомости на проверке</a>
         {% endif %}
       </div>

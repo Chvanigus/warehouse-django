@@ -3,6 +3,7 @@
 from django.contrib.auth import views as auth_views
 from django.urls import path
 
+from core.auth_views import AccountPasswordChangeView
 from spares.adjustment_views import StockAdjustmentListView
 from spares.analytics_views import AnalyticsView
 from spares.stock_card import StockCardView
@@ -28,6 +29,7 @@ urlpatterns = [
         template_name='warehouse/login.html',
     ), name='login'),
     path('logout/', auth_views.LogoutView.as_view(next_page='spares:login'), name='logout'),
+    path('account/password/', AccountPasswordChangeView.as_view(), name='password_change'),
     path('machine_report/', MachineReportView.as_view(), name='machine_report'),
     path('trailer_report/', TrailerReportView.as_view(), name='trailer_report'),
     path('stock_report/', StockReportView.as_view(), name='stock_report'),

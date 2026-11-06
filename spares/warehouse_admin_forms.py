@@ -13,16 +13,17 @@ ROLE_BY_GROUP = {name: key for key, name in WAREHOUSE_ROLES.items()}
 
 
 def safe_warehouse_groups():
-    """Возвращает складские группы, в которых нет дополнительных полномочий."""
+    """Возвращает только группы с полным штатным набором складских прав."""
     groups = Group.objects.filter(name__in=ROLE_BY_GROUP).prefetch_related('permissions__content_type')
     result = {}
     for group in groups:
         role = ROLE_BY_GROUP[group.name]
-        if all(
-            permission.content_type.app_label == 'spares'
-            and permission.codename in WAREHOUSE_ROLE_PERMISSIONS[role]
+        actual_permissions = {
+            (permission.content_type.app_label, permission.codename)
             for permission in group.permissions.all()
-        ):
+        }
+        expected_permissions = {('spares', codename) for codename in WAREHOUSE_ROLE_PERMISSIONS[role]}
+        if actual_permissions == expected_permissions:
             result[role] = group
     return result
 

@@ -1,6 +1,6 @@
 """Выгрузка выбранного оборота и его параметров в XLSX."""
 
-from io import BytesIO
+from tempfile import SpooledTemporaryFile
 
 from openpyxl import Workbook
 from openpyxl.cell import WriteOnlyCell
@@ -42,8 +42,13 @@ def turnover_workbook(rows, filters):
     ):
         parameters.append([label, text_cell(parameters, value)])
 
-    stream = BytesIO()
-    workbook.save(stream)
-    workbook.close()
-    stream.seek(0)
+    stream = SpooledTemporaryFile(max_size=1024 * 1024, mode='w+b')
+    try:
+        workbook.save(stream)
+        stream.seek(0)
+    except Exception:
+        stream.close()
+        raise
+    finally:
+        workbook.close()
     return stream

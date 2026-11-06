@@ -2,43 +2,34 @@
 
 from django.conf import settings
 from django.contrib import admin, messages
-from django.contrib.admin.actions import delete_selected
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.http import HttpResponseRedirect
-from django.utils.translation import gettext_lazy as _
 
 from .catalog_forms import ManualStockForm, StockCorrectionForm
 from .forms import ReceiptForm, WriteOffForm
 from .models import Spares, Warehouses, Company, Contractors, Workers, Machines, MachineWorker, MeasureMeasurement, \
     Trailers, Receipt, Stock, WriteOff, Movement
 from .stock_adjustments import save_manual_stock
+from .validators import load_operation_actor
 
 
 class StockOperationAdmin(admin.ModelAdmin):
-    """Возвращает ошибки складских операций в интерфейс администрирования."""
-    actions = ('delete_selected',)
+    """Проверяет актуальный доступ к изменению и возвращает ошибки операции в админку."""
 
     def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
-        """Показывает причину отказа, если операция сохранения отклонена."""
-        try:
+        """При записи повторно проверяет доступ администратора внутри транзакции."""
+        if request.method != 'POST':
             return super().changeform_view(request, object_id, form_url, extra_context)
-        except ValidationError as error:
-            return self.show_operation_error(request, error)
-
-    def delete_view(self, request, object_id, extra_context=None):
-        """Обрабатывает ошибки при запросе страницы удаления или подтверждении."""
         try:
-            return super().delete_view(request, object_id, extra_context)
-        except ValidationError as error:
-            return self.show_operation_error(request, error)
-
-    @admin.action(permissions=['delete'], description=_('Delete selected %(verbose_name_plural)s'))
-    def delete_selected(self, request, queryset):
-        """Удаляет выбранные записи в одной транзакции и сообщает об отказе."""
-        try:
-            with transaction.atomic(using=queryset.db):
-                return delete_selected(self, request, queryset)
+            with transaction.atomic():
+                try:
+                    request.user = load_operation_actor(request.user, 'Сеанс пользователя завершён.')
+                except ValidationError as error:
+                    raise PermissionDenied from error
+                if not self.admin_site.has_permission(request):
+                    raise PermissionDenied
+                return super().changeform_view(request, object_id, form_url, extra_context)
         except ValidationError as error:
             return self.show_operation_error(request, error)
 

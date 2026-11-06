@@ -2,15 +2,18 @@
 
 from io import StringIO
 
+from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
+from django.core.exceptions import PermissionDenied
 from django.core.management import call_command
 from django.core.management.base import CommandError
-from django.test import TestCase
+from django.test import RequestFactory, TestCase
 from django.urls import reverse
 
+from spares.catalog_views import StockUpdateView
 from spares.management.commands.configure_warehouse_roles import CONTROLLER_GROUP, OPERATOR_GROUP
-from spares.models import Company, Spares, Stock, Warehouses
+from spares.models import Company, Receipt, Spares, Stock, Warehouses
 from spares.warehouse_roles import WAREHOUSE_ROLES
 
 
@@ -72,6 +75,34 @@ class WarehouseRoleTests(TestCase):
         self.client.force_login(self.operator)
         for url_name in ('admin:spares_receipt_add', 'admin:spares_writeoff_add'):
             self.assertEqual(self.client.post(reverse(url_name)).status_code, 403)
+
+    def test_stock_correction_checks_permissions_after_role_revocation(self):
+        """Запрещает менять остаток запросом с сохранёнными в памяти правами."""
+        call_command('configure_warehouse_roles', controller=['controller'], stdout=StringIO())
+        actor = get_user_model().objects.get(pk=self.controller.pk)
+        self.assertTrue(actor.has_perm('spares.change_stock'))
+        call_command('configure_warehouse_roles', operator=['controller'], stdout=StringIO())
+        url = reverse('catalog:stock-edit', args=[self.stock.pk])
+        request = RequestFactory().post(url, {'actual_balance': '100', 'reason': 'Корректировка'})
+        request.user = actor
+        with self.assertRaises(PermissionDenied):
+            StockUpdateView.as_view()(request, pk=self.stock.pk)
+        self.stock.refresh_from_db()
+        self.assertEqual(self.stock.actual_balance, 0)
+
+    def test_admin_post_checks_if_staff_access_was_revoked(self):
+        """Запрещает приход в Django Admin после отзыва статуса сотрудника."""
+        self.controller.is_staff = True
+        self.controller.save(update_fields=['is_staff'])
+        call_command('configure_warehouse_roles', controller=['controller'], stdout=StringIO())
+        model_admin = admin.site.get_model_admin(Receipt)
+        request = RequestFactory().post(reverse('admin:spares_receipt_add'))
+        request.user = self.controller
+        self.assertTrue(model_admin.has_add_permission(request))
+        get_user_model().objects.filter(pk=self.controller.pk).update(is_staff=False)
+        with self.assertRaises(PermissionDenied):
+            model_admin.changeform_view(request)
+        self.assertFalse(Receipt.objects.exists())
 
     def test_assigning_role_replaces_previous_warehouse_group(self):
         """Проверяет смену роли с сохранением внешней группы существующей записи."""

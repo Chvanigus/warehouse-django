@@ -12,6 +12,7 @@ from django.views.generic import DeleteView, DetailView, FormView, ListView
 from .forms import JournalFilterForm
 from .models import Stock
 from .operation_views import OperationCancellationForm, redirect_to_pending_request
+from .permission_views import CurrentPermissionPostMixin
 from .request_models import StockRequest
 from .request_operations import serialize_form_data
 from .request_services import submit_stock_request
@@ -53,7 +54,7 @@ class TransferDetailView(TransferReadMixin, DetailView):
     context_object_name = 'transfer'
 
 
-class TransferCancelView(TransferReadMixin, DeleteView):
+class TransferCancelView(CurrentPermissionPostMixin, TransferReadMixin, DeleteView):
     """Отменяет проведённое перемещение с обязательной причиной."""
     permission_required = ('spares.view_stocktransfer', 'spares.delete_stocktransfer')
     template_name = 'spares/transfers/cancel.html'
@@ -78,7 +79,7 @@ class TransferCancelView(TransferReadMixin, DeleteView):
         return HttpResponseRedirect(reverse('transfers:detail', args=[self.object.pk]))
 
 
-class TransferCreateView(LoginRequiredMixin, PermissionRequiredMixin, FormView):
+class TransferCreateView(CurrentPermissionPostMixin, LoginRequiredMixin, PermissionRequiredMixin, FormView):
     """Принимает заявку на перемещение или сразу проводит его по правам автора."""
     permission_required = ('spares.add_stocktransfer', 'spares.add_stockrequest')
     template_name = 'spares/transfers/form.html'

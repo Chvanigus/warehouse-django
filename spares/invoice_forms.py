@@ -1,6 +1,6 @@
 """Проверка реквизитов, строк, загружаемых файлов и причин отмены накладных."""
 
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 from django import forms
 from django.core.exceptions import ValidationError
@@ -63,10 +63,10 @@ class InvoiceLineForm(forms.Form):
         """Проверяет, что округлённая стоимость строки помещается в поле модели."""
         data = super().clean()
         if 'price' in data and 'quantity' in data:
-            amount = (data['price'] * data['quantity']).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
             try:
+                amount = (data['price'] * data['quantity']).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
                 Receipt._meta.get_field('amount').clean(amount, None)
-            except ValidationError:
+            except (InvalidOperation, ValidationError):
                 raise ValidationError('Сумма строки превышает допустимое значение.') from None
         return data
 

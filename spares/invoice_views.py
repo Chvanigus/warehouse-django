@@ -23,6 +23,7 @@ from .invoice_services import cancel_receipt_invoice, invoice_version
 from .invoice_xlsx import make_invoice_workbook, read_invoice_workbook
 from .models import Receipt
 from .operation_views import redirect_to_pending_request
+from .permission_views import require_current_permissions
 from .request_models import StockRequest
 from .request_operations import serialize_form_data
 from .request_services import submit_stock_request
@@ -63,6 +64,7 @@ class InvoicePermissionMixin(LoginRequiredMixin, PermissionRequiredMixin):
             payload.update(preview_version=preview_version, preview_key=preview_key)
         try:
             with transaction.atomic():
+                require_current_permissions(self)
                 if preview_version is not None:
                     number_key = ReceiptInvoice.normalize_number(header['number'])
                     if invoice_version(header, number_key) != preview_version:
@@ -228,8 +230,10 @@ class InvoiceCancelView(InvoicePermissionMixin, View):
         invoice = get_object_or_404(ReceiptInvoice, pk=pk)
         return render(request, self.template_name, {'invoice': invoice, 'form': InvoiceCancelForm()})
 
+    @transaction.atomic
     def post(self, request, pk):
         """Передаёт отмену в сервис и отображает результат либо ошибку."""
+        require_current_permissions(self)
         invoice = get_object_or_404(ReceiptInvoice, pk=pk)
         form = InvoiceCancelForm(request.POST)
         if form.is_valid():

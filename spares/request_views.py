@@ -13,6 +13,14 @@ from .request_models import StockRequest
 from .request_services import approve_stock_request, reject_stock_request
 
 
+RESULT_VIEW_PERMISSIONS = {
+    'operations:receipts': 'spares.view_receipt',
+    'operations:writeoffs': 'spares.view_writeoff',
+    'invoices:detail': 'spares.view_receipt',
+    'transfers:detail': 'spares.view_stocktransfer',
+}
+
+
 class StockRequestAccessMixin(LoginRequiredMixin, PermissionRequiredMixin):
     """Ограничивает видимость заявок правом просмотра и собственным авторством."""
 
@@ -52,15 +60,19 @@ class StockRequestListView(StockRequestAccessMixin, ListView):
         )
 
 
-def _result_url(stock_request):
-    """Строит локальную ссылку на документ, если маршрут сохранился."""
+def _result_url(stock_request, user):
+    """Строит локальную ссылку на документ, доступный пользователю по его правам."""
     result = stock_request.result
     if not result:
         return ''
     try:
+        route = result['route']
+        permission = RESULT_VIEW_PERMISSIONS.get(route)
+        if permission is None or not user.has_perm(permission):
+            return ''
         if 'query' in result:
-            return reverse(result['route'], query=result['query'])
-        return reverse(result['route'], args=[result['pk']])
+            return reverse(route, query=result['query'])
+        return reverse(route, args=[result['pk']])
     except (NoReverseMatch, KeyError, TypeError, ValueError):
         return ''
 
@@ -76,7 +88,7 @@ class StockRequestDetailView(StockRequestAccessMixin, DetailView):
         fields, lines = describe_request(self.object)
         user = self.request.user
         return super().get_context_data(
-            fields=fields, lines=lines, result_url=_result_url(self.object),
+            fields=fields, lines=lines, result_url=_result_url(self.object, user),
             can_review=(
                 self.object.status == StockRequest.Status.PENDING
                 and self.object.created_by_id != user.pk

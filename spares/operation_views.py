@@ -4,7 +4,6 @@ from django import forms
 from django.contrib import messages
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.core.exceptions import ValidationError
-from django.db import transaction
 from django.http import HttpResponseRedirect
 from django.shortcuts import redirect
 from django.urls import reverse
@@ -14,6 +13,7 @@ from django.views.generic import CreateView, DeleteView, ListView, RedirectView
 
 from .forms import JournalFilterForm
 from .models import Receipt, Stock, WriteOff
+from .permission_views import CurrentPermissionPostMixin
 from .request_models import StockRequest
 from .request_operations import assignment_snapshot, serialize_form_data
 from .request_services import submit_stock_request
@@ -111,14 +111,9 @@ class OperationListView(OperationMixin, ListView):
         return context
 
 
-class OperationEditMixin(OperationMixin):
+class OperationEditMixin(CurrentPermissionPostMixin, OperationMixin):
     """Передаёт данные формы на согласование или немедленное проведение."""
     template_name = 'spares/operations/form.html'
-
-    def post(self, request, *args, **kwargs):
-        """Объединяет проверку формы и подачу заявки в одну транзакцию."""
-        with transaction.atomic():
-            return super().post(request, *args, **kwargs)
 
     def form_valid(self, form):
         """Фиксирует реквизиты заявки и возвращает пользователя к её результату."""
@@ -181,7 +176,7 @@ class OperationCancellationForm(forms.Form):
     )
 
 
-class OperationCancelView(OperationMixin, DeleteView):
+class OperationCancelView(CurrentPermissionPostMixin, OperationMixin, DeleteView):
     """Отменяет проведённый документ с сохранением записи в журнале."""
     permission_action = 'delete'
     template_name = 'spares/operations/delete.html'

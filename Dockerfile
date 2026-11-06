@@ -1,4 +1,4 @@
-FROM python:3.13.14-slim-bookworm
+FROM python:3.13.18-slim-bookworm
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -16,4 +16,4 @@ USER warehouse
 RUN DEBUG=1 python manage.py collectstatic --noinput
 
 EXPOSE 8000
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "1", "--threads", "4", "--access-logfile", "-", "warehouse.wsgi:application"]
+CMD ["sh", "-ec", "python manage.py migrate --check && exec gunicorn --bind 0.0.0.0:8000 --workers 1 --threads 4 --access-logfile - warehouse.wsgi:application"]

@@ -9,7 +9,7 @@ from .inventory_counts import record_inventory_count, update_inventory_summary
 from .inventory_sheet_models import InventorySheet, InventorySheetLine
 from .models import InventoryCount, Stock
 from .stock_adjustments import record_manual_stock, stock_version
-from .validators import require_operation_actor
+from .validators import load_operation_actor
 
 
 MAX_SHEET_LINES = 100
@@ -26,7 +26,7 @@ def _lock_stocks(stock_ids):
 @transaction.atomic
 def submit_inventory_sheet(*, warehouse, actor, entries, note='', expected_versions=None):
     """Сохранить ведомость со снимками и сразу провести её, если автор вправе проверять."""
-    require_operation_actor(actor, 'Для операции нужен автор.')
+    actor = load_operation_actor(actor, 'Для операции нужен действующий автор.')
     entries = list(entries)
     if not 1 <= len(entries) <= MAX_SHEET_LINES:
         raise ValidationError(f'Укажите от 1 до {MAX_SHEET_LINES} позиций.')
@@ -109,7 +109,7 @@ def _record_review(sheet, *, actor, approve, note):
 @transaction.atomic
 def review_inventory_sheet(sheet, *, actor, approve, note=''):
     """Заблокировать ожидающую ведомость и принять решение другого проверяющего."""
-    require_operation_actor(actor, 'Для операции нужен автор.')
+    actor = load_operation_actor(actor, 'Для операции нужен действующий автор.')
     if not actor.has_perm('spares.approve_inventorysheet'):
         raise ValidationError('У вас нет права проверять ведомости.')
     try:

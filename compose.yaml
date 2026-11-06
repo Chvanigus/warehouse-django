@@ -12,6 +12,12 @@ services:
       - "127.0.0.1:${WAREHOUSE_PORT:-8000}:8000"
     volumes:
       - warehouse-data:/data
+    healthcheck:
+      test: ["CMD", "python", "-m", "warehouse.health"]
+      interval: 15s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
 
 volumes:
   warehouse-data:

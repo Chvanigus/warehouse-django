@@ -1,6 +1,6 @@
 """Справочники, складские документы, остатки и история их изменений."""
 
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -202,10 +202,10 @@ class StockOperation(CompanyMixin, SpareMixin, MeasureMixin, WarehouseMixin, Pri
 
     def _calculate_total(self, price, quantity):
         """Умножить цену на количество, округлить до копеек и проверить диапазон суммы."""
-        total = (price * quantity).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
         try:
+            total = (price * quantity).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
             return self._meta.get_field(self.total_field).clean(total, self)
-        except ValidationError as error:
+        except (InvalidOperation, ValidationError) as error:
             raise ValidationError('Итоговая сумма превышает допустимое значение.') from error
 
     def clean(self):
@@ -326,10 +326,13 @@ class Receipt(StockOperation):
     )
 
     class Meta:
-        """Задать отображаемые названия документов прихода."""
+        """Задать названия приходов и индекс для журнала проведённых строк."""
 
         verbose_name_plural = 'Приход'
         verbose_name = 'Приход'
+        indexes = [models.Index(
+            fields=('-date', '-id'), condition=models.Q(cancelled_at__isnull=True), name='receipt_active_date_idx',
+        )]
 
     def __str__(self):
         """Вернуть название запчасти и сумму для краткой подписи прихода."""
@@ -544,10 +547,13 @@ class WriteOff(MachinesWorkersTrailersMixin, StockOperation):
     total_amount = models.DecimalField(verbose_name='Итоговая сумма', max_digits=15, decimal_places=2)
 
     class Meta:
-        """Задать отображаемые названия документов расхода."""
+        """Задать названия списаний и индекс для журнала проведённых строк."""
 
         verbose_name_plural = 'Списания'
         verbose_name = 'Списание'
+        indexes = [models.Index(
+            fields=('-date', '-id'), condition=models.Q(cancelled_at__isnull=True), name='writeoff_active_date_idx',
+        )]
 
     def __str__(self):
         """Вернуть название запчасти для краткой подписи расхода."""

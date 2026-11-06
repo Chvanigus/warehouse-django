@@ -84,8 +84,13 @@ class TurnoverTests(TestCase):
         with patch.object(TurnoverView, 'paginate_by', 1):
             page = self.client.get(reverse('spares:turnover'), params)
         self.assertEqual(len(page.context['rows']), 1)
+        self.assertEqual(page.context['paginator'].count, 2)
+        self.assertEqual(page.context['rows'][0]['measure'], 'шт.')
+        self.assertEqual(page.context['receipts_total'], Decimal('36.00'))
+        self.assertEqual(page.context['writeoffs_total'], Decimal('2.00'))
         self.assertContains(page, 'Скачать XLSX')
-        response = self.client.get(reverse('spares:turnover_export'), params)
+        with patch('spares.turnover_data.EXPORT_BATCH_SIZE', 1):
+            response = self.client.get(reverse('spares:turnover_export'), params)
         self.assertEqual(response.status_code, 200)
         workbook = load_workbook(BytesIO(b''.join(response.streaming_content)))
         self.addCleanup(workbook.close)

@@ -135,14 +135,14 @@ def _top_writeoffs(operations):
 def _stock_snapshot(company, warehouse, show_minimums):
     """Считает текущие складские позиции и при наличии права позиции к пополнению."""
     positions = _scope(Stock.objects.all(), company, warehouse)
-    summary = positions.aggregate(**POSITION_COUNTS)
+    rows = list(positions.values('warehouse_id', 'warehouse__name').annotate(
+        **POSITION_COUNTS,
+    ).order_by('-positions', 'warehouse__name', 'warehouse_id'))
+    summary = {field: sum(row[field] for row in rows) for field in POSITION_COUNTS}
     summary['below_minimum'] = (
         _scope(StockMinimum.objects.with_available(), company, warehouse).below_minimum().count()
         if show_minimums else None
     )
-    rows = list(positions.values('warehouse_id', 'warehouse__name').annotate(
-        **POSITION_COUNTS,
-    ).order_by('-positions', 'warehouse__name', 'warehouse_id'))
     maximum = rows[0]['positions'] if rows else 0
     warehouses = [{
         'id': row['warehouse_id'],

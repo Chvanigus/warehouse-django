@@ -1,0 +1,21 @@
+services:
+  web:
+    environment:
+      DEBUG: "0"
+      WAREHOUSE_PRODUCTION: "1"
+      WAREHOUSE_HTTPS: "1"
+      ALLOWED_HOSTS: ${WAREHOUSE_PUBLIC_HOST:?Set WAREHOUSE_PUBLIC_HOST for production}
+      CSRF_TRUSTED_ORIGINS: https://${WAREHOUSE_PUBLIC_HOST:?Set WAREHOUSE_PUBLIC_HOST for production}
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=64m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 40s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

@@ -61,8 +61,13 @@ class StockRequestTests(TestCase):
         self.assertEqual(apply_request.call_count, 1)
 
         self.client.force_login(self.operator)
-        response = self.client.get(reverse('stock_requests:detail', args=[submitted.pk]))
+        url = reverse('stock_requests:detail', args=[submitted.pk])
         result_url = reverse('operations:receipts', query={'entry': 7})
+        self.assertNotContains(self.client.get(url), f'href="{result_url}"')
+        self.operator.user_permissions.add(Permission.objects.get(
+            content_type__app_label='spares', codename='view_receipt',
+        ))
+        response = self.client.get(url)
         self.assertContains(response, f'href="{result_url}"')
 
     @patch('spares.request_operations.apply_request', return_value={'route': 'transfers:detail', 'pk': 7})
@@ -74,6 +79,33 @@ class StockRequestTests(TestCase):
         self.assertTrue(submitted.applied_automatically)
         self.assertEqual(submitted.result['pk'], 7)
         apply_request.assert_called_once()
+
+    @patch('spares.request_operations.apply_request')
+    def test_revoked_review_permission_is_rechecked_before_writes(self, apply_request):
+        """Отозванное право блокирует ручное и автоматическое согласование даже с кешем."""
+        submitted = self._submit()
+        self.assertTrue(self.reviewer.has_perm('spares.approve_stockrequest'))
+        self.reviewer.user_permissions.remove(self.permissions['approve_stockrequest'])
+
+        with self.assertRaises(PermissionDenied):
+            approve_stock_request(submitted.pk, actor=self.reviewer)
+        with self.assertRaises(PermissionDenied):
+            reject_stock_request(submitted.pk, actor=self.reviewer, reason='Отказ')
+        next_request = self._submit(actor=self.reviewer)
+        submitted.refresh_from_db()
+
+        self.assertEqual(submitted.status, StockRequest.Status.PENDING)
+        self.assertEqual(next_request.status, StockRequest.Status.PENDING)
+        apply_request.assert_not_called()
+
+    def test_revoked_submit_permission_is_rechecked_before_writes(self):
+        """Отозванное право подачи блокирует запись новой заявки даже с кешем."""
+        self.assertTrue(self.operator.has_perm('spares.add_stockrequest'))
+        self.operator.user_permissions.remove(self.permissions['add_stockrequest'])
+
+        with self.assertRaises(PermissionDenied):
+            self._submit()
+        self.assertFalse(StockRequest.objects.exists())
 
     @patch('spares.request_operations.apply_request')
     def test_rejection_requires_reason_and_preserves_names(self, apply_request):

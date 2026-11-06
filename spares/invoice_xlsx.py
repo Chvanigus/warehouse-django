@@ -5,6 +5,7 @@ from pathlib import PurePosixPath
 from re import fullmatch
 from xml.etree.ElementTree import ParseError
 from zipfile import BadZipFile, ZipFile
+from zlib import error as ZlibError
 
 from defusedxml.ElementTree import iterparse
 from defusedxml.common import DefusedXmlException
@@ -119,7 +120,7 @@ def read_invoice_workbook(upload):
         rows = _read_values(data)
     except (
         BadZipFile, DefusedXmlException, ParseError, InvalidFileException, ValueError, TypeError,
-        KeyError, IndexError, AttributeError, OSError, EOFError, NotImplementedError, OverflowError,
+        KeyError, IndexError, AttributeError, OSError, EOFError, NotImplementedError, OverflowError, ZlibError,
     ) as error:
         raise ValidationError('Не удалось прочитать файл XLSX. Скачайте шаблон и сохраните новый файл.') from error
 

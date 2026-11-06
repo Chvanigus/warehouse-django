@@ -176,6 +176,28 @@ class InventorySheetTests(TestCase):
         self.assertEqual((sheet.created_by_id, sheet.reviewed_by_id), (self.controller.pk, self.controller.pk))
         self.assertEqual(StockAdjustment.objects.get().after, Decimal('9.75'))
 
+    def test_revoked_review_permission_does_not_apply_sheets(self):
+        """Сверяет фактическое право перед подтверждением или созданием ведомости."""
+        sheet = self.make_sheet()
+        self.grant(self.controller, 'add_inventorysheet')
+        self.assertTrue(self.controller.has_perm('spares.approve_inventorysheet'))
+        self.controller.user_permissions.remove(Permission.objects.get(
+            content_type__app_label='spares', codename='approve_inventorysheet',
+        ))
+
+        with self.assertRaisesMessage(ValidationError, 'У вас нет права проверять ведомости.'):
+            review_inventory_sheet(sheet, actor=self.controller, approve=True)
+        second_sheet = submit_inventory_sheet(
+            warehouse=self.warehouse, actor=self.controller, entries=[(self.first, 8)],
+        )
+        sheet.refresh_from_db()
+        self.first.refresh_from_db()
+
+        self.assertEqual(sheet.status, InventorySheet.Status.PENDING)
+        self.assertEqual(second_sheet.status, InventorySheet.Status.PENDING)
+        self.assertEqual((self.first.actual_balance, self.first.inventory), (10, 10))
+        self.assertFalse(StockAdjustment.objects.exists())
+
     def test_operator_cannot_read_other_pending_sheet(self):
         """Скрывает чужие ожидающие ведомости от оператора до проведения."""
         another = get_user_model().objects.create_user('other-operator')

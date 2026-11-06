@@ -74,6 +74,14 @@ class InventoryTests(TestCase):
         receipt.delete()
         self.assert_stock(receipt, received=0, used=0, balance=0)
 
+    def test_receipt_with_overflow_cannot_update_stock(self):
+        """Перехватывает переполнение суммы и сохраняет согласованность остатков."""
+        with self.assertRaisesMessage(ValidationError, 'Итоговая сумма превышает допустимое значение.'):
+            self.receipt('9999999999999.99', price='9999999999999.99')
+
+        self.assertFalse(Receipt.objects.exists())
+        self.assertFalse(Stock.objects.exists())
+
     def test_move_only_selected_receipt_into_existing_stock(self):
         """Проверяет перенос одного прихода с сохранением прочих поступлений."""
         original = self.receipt(7)

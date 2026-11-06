@@ -7,7 +7,6 @@ from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.core import signing
 from django.core.exceptions import ValidationError
-from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
@@ -19,6 +18,7 @@ from .forms import StockJournalFilterForm
 from .inventory_counts import record_inventory_count
 from .inventory_sheet_models import InventorySheet
 from .models import InventoryCount, Stock
+from .permission_views import CurrentPermissionPostMixin
 from .stock_adjustments import stock_version
 
 
@@ -43,7 +43,7 @@ class InventoryCountForm(forms.Form):
         return validate_stock_version(self.cleaned_data['revision'], self.stock_revision)
 
 
-class InventoryCountCreateView(LoginRequiredMixin, PermissionRequiredMixin, FormView):
+class InventoryCountCreateView(CurrentPermissionPostMixin, LoginRequiredMixin, PermissionRequiredMixin, FormView):
     """Записывает фактическое количество для выбранной складской позиции."""
     permission_required = 'spares.add_inventorycount'
     template_name = 'spares/inventory/form.html'
@@ -64,11 +64,6 @@ class InventoryCountCreateView(LoginRequiredMixin, PermissionRequiredMixin, Form
     def get_context_data(self, **kwargs):
         """Передаёт выбранную складскую позицию в шаблон пересчёта."""
         return super().get_context_data(stock=self.stock, **kwargs)
-
-    @transaction.atomic
-    def post(self, request, *args, **kwargs):
-        """Выполняет проверку формы и запись пересчёта в одной транзакции."""
-        return super().post(request, *args, **kwargs)
 
     def form_valid(self, form):
         """Записывает пересчёт через сервис и выбирает доступную страницу возврата."""

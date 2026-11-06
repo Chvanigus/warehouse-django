@@ -3,7 +3,10 @@
 from django.contrib import admin
 from django.urls import include, path
 
+from .health import readiness
+
 urlpatterns = [
+    path('healthz/', readiness, name='readiness'),
     path('admin/', admin.site.urls),
     path('management/', include('spares.warehouse_admin_urls')),
     path('requests/', include('spares.request_urls')),
@@ -18,5 +21,6 @@ urlpatterns = [
 ]
 
 # Обработчики ошибок
+handler403 = 'core.views.permission_denied'
 handler404 = 'core.views.page_not_found'
 handler500 = 'core.views.server_error'

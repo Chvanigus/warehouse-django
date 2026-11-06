@@ -1,6 +1,7 @@
 """Настройки склада для локального запуска и развёртывания в Docker."""
 
 import os
+import re
 from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
@@ -16,7 +17,30 @@ def env_list(name, default=''):
     return [value for value in values if value]
 
 
-DEBUG = os.getenv('DEBUG') == '1'
+def env_flag(name):
+    """Читает флаг окружения и останавливает запуск при опечатке в значении."""
+    value = os.getenv(name, '0')
+    if value not in ('0', '1'):
+        raise ImproperlyConfigured(f'{name} должен иметь значение 0 или 1.')
+    return value == '1'
+
+
+def validate_production_settings():
+    """Проверяет обязательные настройки публичного экземпляра до запуска приложения."""
+    if DEBUG or not HTTPS:
+        raise ImproperlyConfigured('Для боевого режима нужны DEBUG=0 и WAREHOUSE_HTTPS=1.')
+    if len(SECRET_KEY) < 50 or len(set(SECRET_KEY)) < 5 or SECRET_KEY.startswith('django-insecure-'):
+        raise ImproperlyConfigured('Укажите длинный случайный SECRET_KEY для боевого режима.')
+    hostname = r'(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?'
+    if len(ALLOWED_HOSTS) != 1 or not re.fullmatch(hostname, ALLOWED_HOSTS[0], re.IGNORECASE | re.ASCII):
+        raise ImproperlyConfigured('Укажите один публичный домен без схемы, порта и подстановочных знаков.')
+    if CSRF_TRUSTED_ORIGINS != [f'https://{ALLOWED_HOSTS[0]}']:
+        raise ImproperlyConfigured('CSRF_TRUSTED_ORIGINS должен содержать HTTPS-адрес публичного домена.')
+
+
+DEBUG = env_flag('DEBUG')
+HTTPS = env_flag('WAREHOUSE_HTTPS')
+PRODUCTION = env_flag('WAREHOUSE_PRODUCTION')
 SECRET_KEY = os.getenv('SECRET_KEY')
 if not SECRET_KEY:
     if not DEBUG:
@@ -25,11 +49,13 @@ if not SECRET_KEY:
 
 ALLOWED_HOSTS = env_list('ALLOWED_HOSTS', 'localhost,127.0.0.1,[::1]')
 CSRF_TRUSTED_ORIGINS = env_list('CSRF_TRUSTED_ORIGINS')
+if PRODUCTION:
+    validate_production_settings()
 LOGIN_URL = 'spares:login'
 LOGIN_REDIRECT_URL = 'spares:warehouse_main'
 
 # Включайте за прокси, который завершает TLS и сам устанавливает X-Forwarded-Proto.
-if os.getenv('WAREHOUSE_HTTPS') == '1':
+if HTTPS:
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
     SECURE_SSL_REDIRECT = True
     SESSION_COOKIE_SECURE = True

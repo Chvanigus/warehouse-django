@@ -90,6 +90,7 @@
               {% if perms.spares.manage_warehouse_users %}<span class="account-role">Администратор</span>
               {% elif perms.spares.approve_stockrequest %}<span class="account-role">Проверяющий</span>
               {% elif perms.spares.add_stockrequest %}<span class="account-role">Оператор</span>{% endif %}
+              <a class="account-role" href="{% url 'spares:password_change' %}">Сменить пароль</a>
             </div>
             <form method="post" action="{% url 'spares:logout' %}">
               {% csrf_token %}

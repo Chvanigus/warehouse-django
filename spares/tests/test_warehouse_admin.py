@@ -1,9 +1,12 @@
 """Проверки управления складскими учётными записями и границ полномочий."""
 
+from io import StringIO
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
 from django.core.exceptions import PermissionDenied
-from django.test import RequestFactory, TestCase
+from django.core.management import call_command
+from django.test import Client, RequestFactory, TestCase
 from django.urls import reverse
 
 from spares.warehouse_admin_views import WarehouseUserUpdateView
@@ -20,11 +23,11 @@ class WarehouseUserManagementTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         """Создаёт штатные роли, администратора и проверяемого сотрудника."""
-        cls.groups = {key: Group.objects.create(name=name) for key, name in WAREHOUSE_ROLES.items()}
+        call_command('configure_warehouse_roles', stdout=StringIO())
+        cls.groups = {key: Group.objects.get(name=name) for key, name in WAREHOUSE_ROLES.items()}
         cls.manage_permission = Permission.objects.get(
             content_type__app_label='spares', codename='manage_warehouse_users',
         )
-        cls.groups['admin'].permissions.add(cls.manage_permission)
         cls.actor = get_user_model().objects.create_user(username='administrator', password=OLD_PASSWORD)
         cls.actor.groups.add(cls.groups['admin'])
         cls.account = get_user_model().objects.create_user(
@@ -110,10 +113,13 @@ class WarehouseUserManagementTests(TestCase):
         self.assertEqual(self.actor.first_name, 'Своё имя')
         self.assertTrue(self.actor.is_active)
         self.assertEqual(list(self.actor.groups.all()), [self.groups['admin']])
-        response = self.client.post(reverse('warehouse_admin:password', args=[self.actor.pk]), {
+        password_url = reverse('warehouse_admin:password', args=[self.actor.pk])
+        response = self.client.post(password_url, {
             'new_password1': NEW_PASSWORD, 'new_password2': NEW_PASSWORD,
         })
-        self.assertRedirects(response, reverse('warehouse_admin:users'))
+        self.assertRedirects(response, reverse('spares:password_change'))
+        self.actor.refresh_from_db()
+        self.assertTrue(self.actor.check_password(OLD_PASSWORD))
 
     def test_role_revocation_blocks_request_with_cached_permissions(self):
         """Проверяет, что ранее авторизованный запрос прекращается после смены роли."""
@@ -166,3 +172,44 @@ class WarehouseUserManagementTests(TestCase):
         self.assertIn('role', response.context['form'].errors)
         self.assertFalse(get_user_model().objects.filter(username='new-employee').exists())
         self.assertEqual(self.client.get(reverse('warehouse_admin:edit', args=[self.account.pk])).status_code, 404)
+
+    def test_incomplete_role_cannot_be_assigned(self):
+        """Показывает сбой настройки роли и блокирует выдачу неполного доступа."""
+        self.client.force_login(self.actor)
+        self.groups['operator'].permissions.clear()
+        listing = self.client.get(reverse('warehouse_admin:users'))
+        self.assertContains(listing, 'Проверьте настройку складских ролей: Оператор.')
+        response = self.client.post(reverse('warehouse_admin:add'), {
+            'username': 'new-employee', 'role': 'operator', 'password1': NEW_PASSWORD, 'password2': NEW_PASSWORD,
+        })
+        self.assertIn('role', response.context['form'].errors)
+        self.assertFalse(get_user_model().objects.filter(username='new-employee').exists())
+
+    def test_employee_changes_own_password_with_current_password(self):
+        """Проверяет вход, CSRF, текущий пароль, сохранение нового пароля и сеанса."""
+        url = reverse('spares:password_change')
+        self.assertRedirects(self.client.get(url), f"{reverse('spares:login')}?next={url}")
+        client = Client(enforce_csrf_checks=True)
+        client.force_login(self.account)
+        form = client.get(url)
+        self.assertContains(form, 'Сменить пароль')
+        self.assertIn('no-store', form.headers['Cache-Control'])
+        values = {'old_password': OLD_PASSWORD, 'new_password1': NEW_PASSWORD, 'new_password2': NEW_PASSWORD}
+        self.assertEqual(client.post(url, values).status_code, 403)
+        values['csrfmiddlewaretoken'] = client.cookies['csrftoken'].value
+        invalid = client.post(url, {**values, 'old_password': 'incorrect'})
+        self.assertIn('old_password', invalid.context['form'].errors)
+        self.account.refresh_from_db()
+        self.assertTrue(self.account.check_password(OLD_PASSWORD))
+        changed = client.post(url, values, follow=True)
+        self.assertRedirects(changed, reverse('spares:warehouse_main'))
+        self.assertContains(changed, 'Пароль изменён.')
+        self.account.refresh_from_db()
+        self.assertTrue(self.account.check_password(NEW_PASSWORD))
+        self.assertEqual(int(client.session['_auth_user_id']), self.account.pk)
+
+    def test_forbidden_page_explains_access(self):
+        """Показывает понятный отказ в доступе после входа без административной роли."""
+        self.client.force_login(self.account)
+        response = self.client.get(reverse('warehouse_admin:users'))
+        self.assertContains(response, 'Доступ ограничен', status_code=403)

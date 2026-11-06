@@ -8,14 +8,15 @@ from django.db import transaction
 from django.utils import timezone
 
 from .request_models import StockRequest
-from .validators import require_operation_actor
+from .validators import load_operation_actor
 
 
 def _require_permission(actor, permission):
-    """Проверяет сохранённого автора и выданное право на действие."""
-    require_operation_actor(actor, 'Для работы с заявкой нужен автор.')
+    """Возвращает активного автора с актуальным разрешением на действие."""
+    actor = load_operation_actor(actor, 'Для работы с заявкой нужен автор.')
     if not actor.has_perm(permission):
         raise PermissionDenied
+    return actor
 
 
 def _snapshot(payload):
@@ -30,7 +31,6 @@ def _snapshot(payload):
 
 def _pending_for_review(request_pk, actor):
     """Блокирует заявку и проверяет, что её ещё может рассмотреть другой сотрудник."""
-    _require_permission(actor, 'spares.approve_stockrequest')
     try:
         stock_request = StockRequest.objects.select_for_update().get(pk=request_pk)
     except StockRequest.DoesNotExist as error:
@@ -75,7 +75,7 @@ def _apply(stock_request, actor, *, automatic=False):
 @transaction.atomic
 def submit_stock_request(kind, payload, *, actor, title):
     """Сохраняет заявку, а при праве согласования проводит её в той же транзакции."""
-    _require_permission(actor, 'spares.add_stockrequest')
+    actor = _require_permission(actor, 'spares.add_stockrequest')
     if kind not in StockRequest.Kind.values:
         raise ValidationError('Неизвестный вид складской заявки.')
     title = (title or '').strip()[:StockRequest._meta.get_field('title').max_length]
@@ -92,12 +92,14 @@ def submit_stock_request(kind, payload, *, actor, title):
 @transaction.atomic
 def approve_stock_request(request_pk, *, actor):
     """Проводит ожидающую заявку другого автора и записывает решение согласовавшего."""
+    actor = _require_permission(actor, 'spares.approve_stockrequest')
     return _apply(_pending_for_review(request_pk, actor), actor)
 
 
 @transaction.atomic
 def reject_stock_request(request_pk, *, actor, reason):
     """Отклоняет ожидающую заявку другого автора и сохраняет обязательную причину."""
+    actor = _require_permission(actor, 'spares.approve_stockrequest')
     stock_request = _pending_for_review(request_pk, actor)
     reason = StockRequest._meta.get_field('review_note').clean((reason or '').strip(), stock_request)
     if not reason:

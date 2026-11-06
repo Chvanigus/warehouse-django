@@ -5,7 +5,6 @@ import re
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.core.exceptions import ValidationError
-from django.db import transaction
 from django.db.models import ProtectedError, Q
 from django.http import Http404, HttpResponseRedirect
 from django.urls import reverse
@@ -14,6 +13,7 @@ from django.views.generic import CreateView, DeleteView, ListView, TemplateView,
 
 from . import models
 from .catalog_forms import ManualStockForm, StockCorrectionForm
+from .permission_views import CurrentPermissionPostMixin
 from .report_forms import StockMinimumFilterForm
 from .stock_adjustments import save_manual_stock
 
@@ -164,18 +164,13 @@ class StockMinimumListView(CatalogListingMixin, ListView):
         return super().get_context_data(filters=self.filters, **kwargs)
 
 
-class CatalogFormMixin(CatalogViewMixin):
+class CatalogFormMixin(CurrentPermissionPostMixin, CatalogViewMixin):
     """Обеспечивает общий шаблон и атомарное сохранение записей справочника."""
     template_name = 'spares/catalog/form.html'
 
     def get_context_data(self, **kwargs):
         """Передаёт заголовок формы в общий шаблон справочников."""
         return super().get_context_data(title=self.title, **kwargs)
-
-    @transaction.atomic
-    def post(self, request, *args, **kwargs):
-        """Проверяет и сохраняет форму справочника в одной транзакции."""
-        return super().post(request, *args, **kwargs)
 
     def form_valid(self, form):
         """Сохраняет запись и показывает уведомление об успехе."""
@@ -196,16 +191,11 @@ class CatalogUpdateView(CatalogFormMixin, UpdateView):
     title = 'Редактирование записи'
 
 
-class CatalogDeleteView(CatalogViewMixin, DeleteView):
+class CatalogDeleteView(CurrentPermissionPostMixin, CatalogViewMixin, DeleteView):
     """Подтверждает удаление записи и обрабатывает защищённые связи."""
     action = 'delete'
     template_name = 'spares/catalog/confirm_delete.html'
     http_method_names = ['get', 'head', 'post', 'options']
-
-    @transaction.atomic
-    def post(self, request, *args, **kwargs):
-        """Выполняет подтверждённое удаление в транзакции."""
-        return super().post(request, *args, **kwargs)
 
     def form_valid(self, form):
         """Удаляет запись либо объясняет, какие связи препятствуют удалению."""
@@ -218,7 +208,7 @@ class CatalogDeleteView(CatalogViewMixin, DeleteView):
         return response
 
 
-class StockFormViewMixin(LoginRequiredMixin, PermissionRequiredMixin):
+class StockFormViewMixin(CurrentPermissionPostMixin, LoginRequiredMixin, PermissionRequiredMixin):
     """Сохраняет ручные изменения остатка с записью автора и причины."""
     model = models.Stock
     form_class = ManualStockForm
@@ -236,11 +226,6 @@ class StockFormViewMixin(LoginRequiredMixin, PermissionRequiredMixin):
             title=self.title, catalog_name='Остатки', back_url=self.get_success_url(),
             stock_form=True, **kwargs,
         )
-
-    @transaction.atomic
-    def post(self, request, *args, **kwargs):
-        """Объединяет проверку формы и сохранение остатка в транзакцию."""
-        return super().post(request, *args, **kwargs)
 
     def form_valid(self, form):
         """Передаёт подготовленный остаток в сервис аудируемых изменений."""

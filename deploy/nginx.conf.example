@@ -1,0 +1,36 @@
+# Пример для подключения из блока http в Nginx на Docker-хосте.
+map "$request_method:$uri" $warehouse_login_key {
+    default "";
+    "POST:/login/" $binary_remote_addr;
+    "POST:/admin/login/" $binary_remote_addr;
+}
+limit_req_zone $warehouse_login_key zone=warehouse_login:10m rate=15r/m;
+
+server {
+    listen 80;
+    server_name warehouse.example.com;
+    return 308 https://warehouse.example.com$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name warehouse.example.com;
+
+    ssl_certificate /etc/letsencrypt/live/warehouse.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/warehouse.example.com/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    client_max_body_size 3m;
+    limit_req zone=warehouse_login burst=20 nodelay;
+    limit_req_status 429;
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Host "";
+        proxy_set_header X-Forwarded-Protocol "";
+        proxy_set_header X-Forwarded-Ssl "";
+    }
+}
