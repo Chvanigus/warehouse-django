@@ -1,4 +1,4 @@
-"""Partial transfers preserve receipt and write-off history."""
+"""Перемещения остатков между складами и их отмена."""
 
 from decimal import Decimal
 
@@ -10,10 +10,12 @@ from django.utils import timezone
 
 from .mixins import CompanyMixin, MeasureMixin, PriceMixin, SpareMixin
 from .models import Stock, Warehouses
-from .validators import validate_posting_date
+from .validators import require_operation_actor, validate_posting_date
 
 
 class StockTransfer(CompanyMixin, SpareMixin, MeasureMixin, PriceMixin):
+    """Документ перемещения между двумя складами с данными автора и отмены."""
+
     from_warehouse = models.ForeignKey(
         Warehouses, on_delete=models.PROTECT, related_name='transfers_out', verbose_name='Со склада',
     )
@@ -43,6 +45,8 @@ class StockTransfer(CompanyMixin, SpareMixin, MeasureMixin, PriceMixin):
     cancellation_reason = models.CharField(max_length=500, blank=True, editable=False, verbose_name='Причина отмены')
 
     class Meta:
+        """Задать права, порядок и ограничения на количество и разные склады."""
+
         default_permissions = ('add', 'delete', 'view')
         ordering = ('-date', '-pk')
         verbose_name = 'Перемещение запчастей'
@@ -56,10 +60,12 @@ class StockTransfer(CompanyMixin, SpareMixin, MeasureMixin, PriceMixin):
         ]
 
     def __str__(self):
+        """Вернуть подпись перемещения с номером документа."""
         return f'Перемещение № {self.pk}'
 
 
 def _move_stock(stocks, source_key, destination_id, quantity):
+    """Списать количество с исходной позиции и прибавить его к позиции на другом складе."""
     try:
         source = stocks.get(**source_key)
     except Stock.DoesNotExist as error:
@@ -88,9 +94,8 @@ def _move_stock(stocks, source_key, destination_id, quantity):
 
 
 def post_transfer(*, source, destination, quantity, date, actor, note=''):
-    """Post a transfer and both balance changes in one transaction."""
-    if not getattr(actor, 'is_authenticated', False) or actor.pk is None:
-        raise ValidationError('Для проведения перемещения нужен автор.')
+    """Проверить реквизиты и сохранить перемещение с обоими изменениями остатков атомарно."""
+    require_operation_actor(actor, 'Для проведения перемещения нужен автор.')
     quantity = StockTransfer._meta.get_field('quantity').clean(quantity, None)
     date = StockTransfer._meta.get_field('date').clean(date, None)
     note = StockTransfer._meta.get_field('note').clean((note or '').strip(), None)
@@ -122,9 +127,8 @@ def post_transfer(*, source, destination, quantity, date, actor, note=''):
 
 
 def cancel_transfer(transfer, *, actor, reason):
-    """Return transferred quantities and record cancellation in one transaction."""
-    if not getattr(actor, 'is_authenticated', False) or actor.pk is None:
-        raise ValidationError('Для отмены нужен автор.')
+    """Вернуть количество на исходный склад и сохранить причину отмены в одной транзакции."""
+    require_operation_actor(actor, 'Для отмены нужен автор.')
     reason = (reason or '').strip()
     if not reason:
         raise ValidationError('Укажите причину отмены.')

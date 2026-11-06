@@ -1,3 +1,4 @@
+/** Подключает таблицы отчётов, русскую локаль и выгрузку разрешённых для экспорта столбцов. */
 const languageUrl = document.currentScript.dataset.languageUrl;
 
 for (const table of document.querySelectorAll('.report-datatable')) {

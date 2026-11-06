@@ -1,4 +1,5 @@
-"""Views for the warehouse dashboard and reports."""
+"""Главная страница склада и представления отчётов."""
+
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.db.models import Count, Q, Sum
 from django.utils import timezone
@@ -12,9 +13,11 @@ from spares.threshold_models import StockMinimum
 
 
 class WarehouseMainView(LoginRequiredMixin, TemplateView):
+    """Показывает сводку склада и последние документы в пределах прав пользователя."""
     template_name = 'warehouse/index.html'
 
     def get_context_data(self, **kwargs):
+        """Собирает доступные остатки, счётчики месяца и недавние операции."""
         context = super().get_context_data(**kwargs)
         user = self.request.user
         today = timezone.localdate()
@@ -36,15 +39,19 @@ class WarehouseMainView(LoginRequiredMixin, TemplateView):
 
 
 class WarehouseReportMixin(LoginRequiredMixin, PermissionRequiredMixin):
+    """Проверяет вход и право просмотра отчёта и задаёт ключ выдачи в шаблоне."""
     context_object_name = 'report_data'
 
 
 class FilteredReportView(WarehouseReportMixin, ListView):
+    """Строит отчёт по проведённым документам за выбранный период."""
     @cached_property
     def form(self):
+        """Создаёт форму периода и объекта отчёта из параметров GET."""
         return self.form_class(self.request.GET or None)
 
     def get_queryset(self):
+        """Возвращает неотменённые документы по объекту и включительному диапазону дат."""
         if not self.form.is_valid():
             return self.model.objects.none()
         data = self.form.cleaned_data
@@ -59,6 +66,7 @@ class FilteredReportView(WarehouseReportMixin, ListView):
         )
 
     def get_context_data(self, **kwargs):
+        """Передаёт фильтры, заголовок и итоговую сумму отобранных документов."""
         context = super().get_context_data(**kwargs)
         context['form'] = self.form
         context['report_title'] = self.report_title
@@ -68,6 +76,7 @@ class FilteredReportView(WarehouseReportMixin, ListView):
 
 
 class WriteOffReportView(FilteredReportView):
+    """Собирает данные списаний для отчёта по технике или прицепам."""
     model = WriteOff
     amount_field = 'total_amount'
     permission_required = 'spares.view_writeoff'
@@ -75,12 +84,14 @@ class WriteOffReportView(FilteredReportView):
     related_fields = ('machine', 'trailer', 'worker', 'spare', 'measure', 'company', 'warehouse')
 
     def get_context_data(self, **kwargs):
+        """Передаёт поле транспорта для общей таблицы списаний."""
         context = super().get_context_data(**kwargs)
         context['vehicle_field'] = self.model_field
         return context
 
 
 class MachineReportView(WriteOffReportView):
+    """Отбирает списания для выбранной единицы техники."""
     form_class = MachineReportForm
     form_field = 'machine'
     model_field = 'machine'
@@ -88,6 +99,7 @@ class MachineReportView(WriteOffReportView):
 
 
 class TrailerReportView(WriteOffReportView):
+    """Отбирает списания для выбранного прицепа."""
     form_class = TrailersReportForm
     form_field = 'trailers'
     model_field = 'trailer'
@@ -95,6 +107,7 @@ class TrailerReportView(WriteOffReportView):
 
 
 class ContractorReportView(FilteredReportView):
+    """Отбирает приход и сумму по выбранному контрагенту."""
     model = Receipt
     form_class = ContractorsReportForm
     form_field = 'contractors'
@@ -107,6 +120,7 @@ class ContractorReportView(FilteredReportView):
 
 
 class StockReportView(WarehouseReportMixin, ListView):
+    """Показывает текущие остатки, расхождения и количество позиций к пополнению."""
     model = Stock
     queryset = Stock.objects.select_related('spare', 'measure', 'company', 'warehouse').order_by('spare__name', 'pk')
     permission_required = 'spares.view_stock'
@@ -114,15 +128,18 @@ class StockReportView(WarehouseReportMixin, ListView):
 
     @cached_property
     def form(self):
+        """Создаёт форму фильтрации складских остатков."""
         return StockFilterForm(self.request.GET or None)
 
     def get_queryset(self):
+        """Отбирает остатки по фильтрам склада и при необходимости только с расхождениями."""
         queryset = self.form.filter_groups(super().get_queryset())
         if self.form.is_valid() and self.form.cleaned_data['discrepancy']:
             queryset = queryset.filter(inventory__isnull=False, discrepancy=True)
         return queryset
 
     def get_context_data(self, **kwargs):
+        """Считает позиции, расхождения, отсутствие остатков и доступные данные пополнения."""
         context = super().get_context_data(**kwargs)
         context['form'] = self.form
         context['counts'] = self.object_list.aggregate(
@@ -137,10 +154,12 @@ class StockReportView(WarehouseReportMixin, ListView):
 
 
 class IncomeOutcomeReportView(WarehouseReportMixin, TemplateView):
+    """Показывает годовые сводки прихода и расхода при наличии обоих прав."""
     permission_required = ('spares.view_receipt', 'spares.view_writeoff')
     template_name = 'spares/income_outcome_report.html'
 
     def get_context_data(self, **kwargs):
+        """Передаёт месячные суммы двух сводок и русские подписи месяцев."""
         context = super().get_context_data(**kwargs)
         context['income_report'] = get_income_report()
         context['outcome_report'] = get_outcome_report()

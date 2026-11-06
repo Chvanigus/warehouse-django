@@ -1,3 +1,5 @@
+"""Отчёты склада, проверка параметров и переходы при входе."""
+
 from datetime import date
 from decimal import Decimal
 
@@ -10,8 +12,11 @@ from spares.models import Company, Contractors, Machines, Receipt, Spares, Stock
 
 
 class WarehouseReportTests(TestCase):
+    """Проверяет права просмотра и корректность агрегации документов."""
+
     @classmethod
     def setUpTestData(cls):
+        """Создаёт справочники, пользователей и документы для отчётных сценариев."""
         cls.reader = get_user_model().objects.create_user(username='reporter', password='warehouse-test-password')
         cls.reader.user_permissions.add(*Permission.objects.filter(
             content_type__app_label='spares',
@@ -29,6 +34,7 @@ class WarehouseReportTests(TestCase):
         }
 
     def test_login_preserves_requested_report_and_logout_requires_post(self):
+        """Проверяет возврат к выбранному отчёту после входа и выход только по POST."""
         report_url = reverse('spares:stock_report')
         login_url = reverse('spares:login')
         logout_url = reverse('spares:logout')
@@ -42,6 +48,7 @@ class WarehouseReportTests(TestCase):
         self.assertRedirects(self.client.post(logout_url), login_url)
 
     def test_report_permissions_and_landing_page(self):
+        """Проверяет доступ к отчётам и отображение разрешённых разделов."""
         user = get_user_model().objects.create_user(username='unprivileged')
         self.client.force_login(user)
         dashboard = self.client.get(reverse('spares:warehouse_main'))
@@ -53,6 +60,7 @@ class WarehouseReportTests(TestCase):
                 self.assertEqual(self.client.get(url).status_code, 403)
 
     def test_reports_render_without_filters_and_validate_bad_query_values(self):
+        """Проверяет пустые формы отчётов и ошибки неверных параметров."""
         self.client.force_login(self.reader)
         for route, field in (
             ('contractor_report', 'contractors'),
@@ -70,6 +78,7 @@ class WarehouseReportTests(TestCase):
                 self.assertFalse(bad.context['report_data'])
 
     def test_contractor_report_handles_month_boundaries_and_legacy_urls(self):
+        """Проверяет границы отчётного месяца и разбор прежних параметров ссылки."""
         self.client.force_login(self.reader)
         for day in (date(2024, 2, 29), date(2024, 3, 1)):
             Receipt.objects.create(
@@ -89,6 +98,7 @@ class WarehouseReportTests(TestCase):
         self.assertIn('end_date', reversed_range.context['form'].errors)
 
     def test_outcome_includes_company_with_only_writeoffs(self):
+        """Проверяет включение фирмы со списаниями при отсутствии приходов."""
         self.client.force_login(self.reader)
         Stock.objects.create(actual_balance=5, **self.stock_key)
         for month in (1, 2):

@@ -1,3 +1,5 @@
+"""Подготовка, согласование и атомарность инвентаризационных ведомостей."""
+
 from decimal import Decimal
 from unittest.mock import patch
 
@@ -14,8 +16,11 @@ from spares.stock_adjustments import record_manual_stock
 
 
 class InventorySheetTests(TestCase):
+    """Проверяет форму ведомости, полномочия и связанные корректировки."""
+
     @classmethod
     def setUpTestData(cls):
+        """Создаёт два склада, контрольные остатки и участников с разными разрешениями."""
         cls.warehouse = Warehouses.objects.create(name='Основной')
         cls.other_warehouse = Warehouses.objects.create(name='Другой')
         cls.company = Company.objects.create(name='Фирма')
@@ -29,6 +34,7 @@ class InventorySheetTests(TestCase):
 
     @classmethod
     def make_stock(cls, name, quantity, warehouse):
+        """Создаёт позицию с согласованными учётным и фактическим остатками."""
         return Stock.objects.create(
             spare=Spares.objects.create(name=name), warehouse=warehouse, company=cls.company,
             price='100.00', actual_balance=quantity, inventory=quantity, inventory_book_balance=quantity,
@@ -36,17 +42,20 @@ class InventorySheetTests(TestCase):
 
     @classmethod
     def grant(cls, user, *permissions):
+        """Добавляет складские разрешения выбранному участнику."""
         user.user_permissions.add(*Permission.objects.filter(
             content_type__app_label='spares', codename__in=permissions,
         ))
 
     def make_sheet(self, second_quantity='20'):
+        """Подаёт ведомость из двух позиций с заданным количеством второй строки."""
         return submit_inventory_sheet(
             warehouse=self.warehouse, actor=self.operator,
             entries=[(self.first, Decimal('9.75')), (self.second, Decimal(second_quantity))],
         )
 
     def open_form(self):
+        """Открывает ведомость нужного склада и возвращает параметры её отправки."""
         self.client.force_login(self.operator)
         url = reverse('inventory_sheets:add')
         response = self.client.get(url, {'warehouse': self.warehouse.pk})
@@ -64,6 +73,7 @@ class InventorySheetTests(TestCase):
         }
 
     def test_operator_submits_and_controller_approves_linked_corrections(self):
+        """Проверяет раздельное согласование и связь подтверждённой разницы с корректировкой."""
         url, data = self.open_form()
         result = self.client.post(url, data)
         sheet = InventorySheet.objects.get()
@@ -92,6 +102,7 @@ class InventorySheetTests(TestCase):
         self.assertEqual(StockAdjustment.objects.count(), 1)
 
     def test_stale_form_and_wrong_warehouse_are_rejected(self):
+        """Проверяет отказ при устаревшем снимке, дублировании и выборе другого склада."""
         url, data = self.open_form()
         result = self.client.post(url, {**data, 'form-1-stock': self.other.pk})
         self.assertEqual(result.status_code, 200)
@@ -105,6 +116,7 @@ class InventorySheetTests(TestCase):
         self.assertFalse(InventoryCount.objects.exists())
 
     def test_stale_sheet_blocks_entire_approval_and_rejection_preserves_summary(self):
+        """Проверяет откат согласования и сохранение прежнего пересчёта после отклонения."""
         sheet = self.make_sheet(second_quantity='18')
         self.second.actual_balance = 21
         self.second.save(update_fields=['actual_balance'])
@@ -126,9 +138,11 @@ class InventorySheetTests(TestCase):
         self.assertEqual(InventoryCount.objects.count(), 2)
 
     def test_second_adjustment_failure_rolls_back_first(self):
+        """Проверяет откат всей ведомости при ошибке записи второй корректировки."""
         sheet = self.make_sheet(second_quantity='18')
 
         def fail_second(stock, **kwargs):
+            """Вызывает штатную запись для первой строки и имитирует ошибку второй."""
             if stock.pk == self.second.pk:
                 raise ValidationError('Ошибка второй строки.')
             return record_manual_stock(stock, **kwargs)
@@ -143,6 +157,7 @@ class InventorySheetTests(TestCase):
         self.assertFalse(StockAdjustment.objects.exists())
 
     def test_author_cannot_confirm_own_sheet_even_with_controller_permission(self):
+        """Проверяет запрет самосогласования при наличии права контролёра."""
         sheet = self.make_sheet()
         self.grant(self.operator, 'approve_inventorysheet')
         self.client.force_login(self.operator)

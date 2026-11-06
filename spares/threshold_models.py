@@ -1,4 +1,4 @@
-"""Minimum stock rules aggregated across price lots."""
+"""Минимальные остатки и сравнение с доступным количеством всех ценовых партий."""
 
 from decimal import Decimal
 
@@ -11,7 +11,10 @@ from django.db.models.lookups import IsNull
 
 
 class StockMinimumQuerySet(models.QuerySet):
+    """Запрос порогов с расчётом доступного остатка и отбором недостач."""
+
     def with_available(self):
+        """Добавить сумму остатков по запчасти, фирме, складу и единице."""
         stock = apps.get_model('spares', 'Stock')
         totals = (
             stock.objects.filter(
@@ -34,10 +37,13 @@ class StockMinimumQuerySet(models.QuerySet):
         ))
 
     def below_minimum(self):
+        """Отобрать пороги, по которым доступное количество меньше минимума."""
         return self.filter(available__lt=F('minimum'))
 
 
 class StockMinimum(models.Model):
+    """Минимум запаса по позиции без разделения на цены."""
+
     spare = models.ForeignKey('spares.Spares', on_delete=models.PROTECT, verbose_name='Запчасть')
     company = models.ForeignKey('spares.Company', on_delete=models.PROTECT, verbose_name='Фирма')
     warehouse = models.ForeignKey('spares.Warehouses', on_delete=models.PROTECT, verbose_name='Склад')
@@ -54,10 +60,13 @@ class StockMinimum(models.Model):
     objects = StockMinimumQuerySet.as_manager()
 
     def __str__(self):
+        """Вернуть подпись порога с запчастью, складом, фирмой и единицей."""
         unit = f' ({self.measure})' if self.measure_id else ''
         return f'{self.spare} · {self.warehouse} · {self.company}{unit}'
 
     class Meta:
+        """Задать ограничения положительности и уникальности порога, в том числе без единицы."""
+
         verbose_name = 'Минимальный остаток'
         verbose_name_plural = 'Минимальные остатки'
         constraints = [

@@ -1,3 +1,5 @@
+"""Минимальные остатки, артикулы и поиск складских позиций."""
+
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
@@ -10,8 +12,11 @@ from spares.threshold_models import StockMinimum
 
 
 class StockMinimumTests(TestCase):
+    """Проверяет правила пополнения, права и нормализацию артикулов."""
+
     @classmethod
     def setUpTestData(cls):
+        """Создаёт роли, справочники и правило минимального остатка."""
         cls.operator = get_user_model().objects.create_user(username='minimum-operator')
         cls.operator.user_permissions.add(*Permission.objects.filter(
             content_type__app_label='spares',
@@ -28,10 +33,12 @@ class StockMinimumTests(TestCase):
         cls.measure = MeasureMeasurement.objects.create(name='шт.')
 
     def setUp(self):
+        """Входит под пользователем, который может вести минимальные остатки."""
         self.client.force_login(self.operator)
         self.key = dict(spare=self.spare, company=self.company, warehouse=self.warehouse, measure=self.measure)
 
     def test_minimum_counts_only_matching_stock_across_prices(self):
+        """Проверяет расчёт по ценовым партиям при совпадении прочих реквизитов."""
         for quantity, price in (('0.10', 1), ('0.70', 2)):
             Stock.objects.create(**self.key, actual_balance=Decimal(quantity), price=price)
         for overrides in ({'company': self.other_company}, {'warehouse': self.other_warehouse}, {'measure': None}):
@@ -53,6 +60,7 @@ class StockMinimumTests(TestCase):
         self.assertQuerySetEqual(rules.below_minimum(), [exact, missing], ordered=False)
 
     def test_stock_and_minimum_lists_search_by_sku_and_link_to_filtered_shortage(self):
+        """Проверяет поиск по артикулу и ссылку на отфильтрованный дефицит."""
         stock = Stock.objects.create(**self.key, actual_balance=2)
         rule = StockMinimum.objects.create(**self.key, minimum=3)
         filters = {'q': 'флт-1', 'warehouse': self.warehouse.pk}
@@ -65,6 +73,7 @@ class StockMinimumTests(TestCase):
         self.assertContains(minimums_response, 'К пополнению')
 
     def test_minimum_crud_rejects_duplicate_without_measure(self):
+        """Проверяет управление минимумом и защиту от дубля с пустой единицей."""
         data = {'spare': self.spare.pk, 'company': self.company.pk, 'warehouse': self.warehouse.pk, 'minimum': '2.5'}
         add_url = reverse('catalog:add', args=['minimums'])
         index = reverse('catalog:minimums')
@@ -81,6 +90,7 @@ class StockMinimumTests(TestCase):
         self.assertFalse(StockMinimum.objects.exists())
 
     def test_catalog_sku_is_optional_normalized_and_unique(self):
+        """Проверяет необязательность, нормализацию и уникальность артикула."""
         add_url = reverse('catalog:add', args=['spares'])
         index = reverse('catalog:list', args=['spares'])
         self.assertEqual(Spares.objects.get(pk=self.spare.pk).sku, 'ФЛТ-1')
@@ -92,6 +102,7 @@ class StockMinimumTests(TestCase):
         self.assertEqual(Spares.objects.filter(sku__isnull=True).count(), 2)
 
     def test_rule_permissions_are_independent_of_stock_view_permission(self):
+        """Проверяет отдельное право просмотра правил минимальных остатков."""
         viewer = get_user_model().objects.create_user(username='stock-viewer')
         viewer.user_permissions.add(Permission.objects.get(content_type__app_label='spares', codename='view_stock'))
         self.client.force_login(viewer)

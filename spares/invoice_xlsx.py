@@ -1,3 +1,5 @@
+"""Безопасное чтение и создание шаблона накладной в формате XLSX."""
+
 from io import BytesIO
 from pathlib import PurePosixPath
 from re import fullmatch
@@ -22,7 +24,28 @@ MAX_EXPANDED_BYTES = 16 * 1024 * 1024
 MAX_ARCHIVE_MEMBERS = 128
 
 
+def _inspect_xml(xml, *, worksheet):
+    """Проверить содержимое XML на внешние связи, формулы и выход за границы шаблона."""
+    for _, node in iterparse(xml, events=('end',), forbid_dtd=True, forbid_entities=True, forbid_external=True):
+        tag = node.tag.rsplit('}', 1)[-1]
+        if node.get('TargetMode') == 'External':
+            raise ValidationError('Удалите внешние связи из файла.')
+        if worksheet and tag == 'f':
+            raise ValidationError('Замените формулы в файле на значения.')
+        if worksheet and tag in ('row', 'c'):
+            coordinate = fullmatch(r'([A-E]?)([1-9]\d{0,2})', node.get('r', ''))
+            if (
+                coordinate is None or bool(coordinate[1]) != (tag == 'c')
+                or int(coordinate[2]) > MAX_INVOICE_LINES + 1
+            ):
+                raise ValidationError(
+                    f'Заполните только столбцы шаблона и не более {MAX_INVOICE_LINES} строк.',
+                )
+        node.clear()
+
+
 def _inspect_archive(data):
+    """Проверить структуру и размеры архива до чтения книги."""
     with ZipFile(BytesIO(data)) as archive:
         members = archive.infolist()
         names = {part.filename for part in members}
@@ -44,30 +67,16 @@ def _inspect_archive(data):
                 continue
             worksheet = filename.startswith('xl/worksheets/') and '/_rels/' not in filename
             with archive.open(part) as xml:
-                for _, node in iterparse(xml, events=('end',), forbid_dtd=True, forbid_entities=True, forbid_external=True):
-                    tag = node.tag.rsplit('}', 1)[-1]
-                    if node.get('TargetMode') == 'External':
-                        raise ValidationError('Удалите внешние связи из файла.')
-                    if worksheet and tag == 'f':
-                        raise ValidationError('Замените формулы в файле на значения.')
-                    if worksheet and tag in ('row', 'c'):
-                        ref = node.get('r', '')
-                        coordinate = fullmatch(r'([A-E]?)([1-9]\d{0,2})', ref)
-                        if (
-                            coordinate is None or bool(coordinate[1]) != (tag == 'c')
-                            or int(coordinate[2]) > MAX_INVOICE_LINES + 1
-                        ):
-                            raise ValidationError(
-                                f'Заполните только столбцы шаблона и не более {MAX_INVOICE_LINES} строк.',
-                            )
-                    node.clear()
+                _inspect_xml(xml, worksheet=worksheet)
 
 
 def _as_text(value):
+    """Привести непустую ячейку к строке и убрать пробелы по краям."""
     return '' if value is None else str(value).strip()
 
 
 def _names_by_key(model):
+    """Собрать список ключей справочника по нормализованным названиям."""
     names = {}
     for pk, name in model.objects.values_list('pk', 'name').iterator():
         names.setdefault(name.strip().casefold(), []).append(pk)
@@ -75,6 +84,7 @@ def _names_by_key(model):
 
 
 def _resolve_name(mapping, value, description):
+    """Найти единственную запись справочника по названию или сообщить об ошибке."""
     matches = mapping.get(value.casefold(), [])
     if len(matches) != 1:
         raise ValidationError(f'{description} «{value}» отсутствует в справочнике или найдено несколько совпадений.')
@@ -82,6 +92,7 @@ def _resolve_name(mapping, value, description):
 
 
 def _read_values(data):
+    """Прочитать непустые строки одного видимого листа с ожидаемыми заголовками."""
     _inspect_archive(data)
     workbook = load_workbook(BytesIO(data), read_only=True, data_only=False, keep_links=False)
     try:
@@ -98,6 +109,7 @@ def _read_values(data):
 
 
 def read_invoice_workbook(upload):
+    """Проверить загруженную книгу и преобразовать строки в данные формы накладной."""
     if not upload.name.lower().endswith('.xlsx') or upload.size > MAX_FILE_BYTES:
         raise ValidationError('Выберите файл XLSX размером до 2 МБ.')
     data = upload.read(MAX_FILE_BYTES + 1)
@@ -145,6 +157,7 @@ def read_invoice_workbook(upload):
 
 
 def make_invoice_workbook():
+    """Подготовить пустой шаблон XLSX с заданными заголовками и форматом артикула."""
     workbook = Workbook()
     sheet = workbook.active
     sheet.title = 'Позиции'

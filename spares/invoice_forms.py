@@ -1,3 +1,5 @@
+"""Проверка реквизитов, строк, загружаемых файлов и причин отмены накладных."""
+
 from decimal import Decimal, ROUND_HALF_UP
 
 from django import forms
@@ -9,6 +11,7 @@ from .models import Company, Contractors, MeasureMeasurement, Receipt, Spares, W
 
 
 class InvoiceHeaderForm(forms.Form):
+    """Принимает номер, дату, фирму, поставщика и склад назначения накладной."""
     number = forms.CharField(label='Номер накладной', max_length=255)
     date = forms.DateField(
         label='Дата накладной', initial=timezone.localdate,
@@ -19,12 +22,14 @@ class InvoiceHeaderForm(forms.Form):
     warehouse = forms.ModelChoiceField(label='Склад', queryset=Warehouses.objects.order_by('name', 'pk'))
 
     def clean_date(self):
+        """Запрещает проводить накладную будущей датой."""
         date = self.cleaned_data['date']
         if date > timezone.localdate():
             raise ValidationError('Нельзя провести накладную будущей датой.')
         return date
 
     def clean(self):
+        """Проверяет уникальность номера для фирмы и поставщика."""
         data = super().clean()
         if all(data.get(field) for field in ('company', 'contractor', 'number')):
             try:
@@ -35,12 +40,14 @@ class InvoiceHeaderForm(forms.Form):
 
 
 class InvoiceUploadForm(InvoiceHeaderForm):
+    """Дополняет реквизиты накладной загрузкой файла со строками."""
     workbook = forms.FileField(
         label='Файл с позициями', widget=forms.FileInput(attrs={'accept': '.xlsx'}),
     )
 
 
 class InvoiceLineForm(forms.Form):
+    """Проверяет запчасть, количество, цену и допустимую сумму строки."""
     spare = forms.ModelChoiceField(label='Запчасть', queryset=Spares.objects.order_by('name', 'pk'))
     measure = forms.ModelChoiceField(
         label='Единица измерения', queryset=MeasureMeasurement.objects.order_by('name', 'pk'), required=False,
@@ -53,6 +60,7 @@ class InvoiceLineForm(forms.Form):
     )
 
     def clean(self):
+        """Проверяет, что округлённая стоимость строки помещается в поле модели."""
         data = super().clean()
         if 'price' in data and 'quantity' in data:
             amount = (data['price'] * data['quantity']).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
@@ -64,12 +72,15 @@ class InvoiceLineForm(forms.Form):
 
 
 class BaseInvoiceLineFormSet(forms.BaseFormSet):
+    """Проверяет набор строк перед проведением накладной."""
     def clean(self):
+        """Проверяет совместимость заполненных строк, когда все отдельные формы валидны."""
         if any(self.errors):
             return
         validate_invoice_lines(self.posted_lines())
 
     def posted_lines(self):
+        """Возвращает данные заполненных строк без помеченных к удалению."""
         return [
             {key: form.cleaned_data[key] for key in InvoiceLineForm.base_fields}
             for form in self.forms
@@ -85,6 +96,7 @@ InvoiceLineFormSet = forms.formset_factory(
 
 
 class InvoiceCancelForm(forms.Form):
+    """Требует текст причины для отмены накладной."""
     reason = forms.CharField(
         label='Причина отмены', max_length=500, widget=forms.Textarea(attrs={'rows': 3}),
     )

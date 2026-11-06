@@ -1,3 +1,5 @@
+"""Карточка движения позиции с хронологией документов и обратных записей."""
+
 from datetime import datetime, timedelta, timezone as utc_timezone
 from decimal import Decimal
 from unittest.mock import patch
@@ -15,8 +17,11 @@ from spares.transfer_models import cancel_transfer, post_transfer
 
 
 class StockCardTests(TestCase):
+    """Проверяет точность отбора по позиции, права и порядок записей."""
+
     @classmethod
     def setUpTestData(cls):
+        """Готовит документы нескольких позиций, корректировки, перемещения и отмены."""
         users = get_user_model().objects
         cls.reader = users.create_user('stock-card-reader')
         cls.staff = users.create_user('stock-card-operator')
@@ -72,9 +77,11 @@ class StockCardTests(TestCase):
             )
 
     def setUp(self):
+        """Входит под пользователем с доступом к карточке движения."""
         self.url = reverse('spares:stock_card', args=[self.stock.pk])
 
     def test_history_keeps_exact_stock_key_and_signed_reversals(self):
+        """Проверяет точный ключ позиции и знак каждого документа и его отмены."""
         self.client.force_login(self.staff)
         response = self.client.get(self.url)
         self.assertContains(response, 'Текущий остаток')
@@ -108,6 +115,7 @@ class StockCardTests(TestCase):
         self.assertEqual([row['delta'] for row in response.context['entries']], [Decimal('-3.50')])
 
     def test_permissions_hide_unavailable_sources(self):
+        """Проверяет сокрытие событий, на просмотр источников которых нет разрешения."""
         self.assertEqual(self.client.get(self.url).status_code, 302)
         self.client.force_login(self.no_stock)
         self.assertEqual(self.client.get(self.url).status_code, 403)
@@ -125,6 +133,7 @@ class StockCardTests(TestCase):
         self.assertNotContains(response, 'Получатель')
 
     def test_dates_and_pagination(self):
+        """Проверяет даты событий, порядок вывода и сохранение фильтров при листании."""
         self.client.force_login(self.staff)
         response = self.client.get(self.url, {'kind': 'adjustment', 'date_from': '2026-11-05', 'date_to': '2026-11-05'})
         self.assertEqual([entry['event_pk'] for entry in response.context['entries']], [self.adjustment.pk])

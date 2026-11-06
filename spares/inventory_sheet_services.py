@@ -1,24 +1,22 @@
+"""Подача, проверка и проведение инвентаризационных ведомостей."""
+
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Max
 from django.utils import timezone
 
-from .catalog_forms import stock_version
 from .inventory_counts import record_inventory_count, update_inventory_summary
 from .inventory_sheet_models import InventorySheet, InventorySheetLine
 from .models import InventoryCount, Stock
-from .stock_adjustments import record_manual_stock
+from .stock_adjustments import record_manual_stock, stock_version
+from .validators import require_operation_actor
 
 
 MAX_SHEET_LINES = 100
 
 
-def _require_actor(actor):
-    if not getattr(actor, 'is_authenticated', False) or actor.pk is None:
-        raise ValidationError('Для операции нужен автор.')
-
-
 def _lock_stocks(stock_ids):
+    """Заблокировать остатки в порядке их номеров и вернуть их по ключам."""
     return {
         stock.pk: stock
         for stock in Stock.objects.select_for_update().filter(pk__in=stock_ids).order_by('pk')
@@ -27,7 +25,8 @@ def _lock_stocks(stock_ids):
 
 @transaction.atomic
 def submit_inventory_sheet(*, warehouse, actor, entries, note='', expected_versions=None):
-    _require_actor(actor)
+    """Проверить позиции и сохранить ведомость со снимками без изменения текущих остатков."""
+    require_operation_actor(actor, 'Для операции нужен автор.')
     entries = list(entries)
     if not 1 <= len(entries) <= MAX_SHEET_LINES:
         raise ValidationError(f'Укажите от 1 до {MAX_SHEET_LINES} позиций.')
@@ -55,9 +54,42 @@ def submit_inventory_sheet(*, warehouse, actor, entries, note='', expected_versi
     return sheet
 
 
+def _apply_sheet_counts(sheet, actor):
+    """Проверить актуальность всех пересчётов до применения сводок и корректировок."""
+    lines = list(sheet.lines.select_related('count').order_by('count__stock_id', 'pk'))
+    if not lines:
+        raise ValidationError('Ведомость не содержит позиций.')
+    stocks = _lock_stocks([line.count.stock_id for line in lines])
+    latest_counts = dict(
+        InventoryCount.objects.filter(stock_id__in=stocks)
+        .exclude(sheet_line__sheet__status=InventorySheet.Status.REJECTED)
+        .order_by().values('stock_id').annotate(latest=Max('pk')).values_list('stock_id', 'latest')
+    )
+    for line in lines:
+        count = line.count
+        stock = stocks.get(count.stock_id)
+        if (
+            stock is None or latest_counts.get(count.stock_id) != count.pk
+            or stock_version(stock) != line.stock_revision
+        ):
+            raise ValidationError(
+                f'Данные позиции «{count.stock_label}» изменились после пересчёта. '
+                'Отклоните ведомость и создайте новую.',
+            )
+    for line in lines:
+        count = line.count
+        stock = stocks[count.stock_id]
+        update_inventory_summary(stock, count)
+        if count.difference:
+            stock.actual_balance = count.counted_quantity
+            line.adjustment = record_manual_stock(stock, actor=actor, reason=f'По ведомости № {sheet.pk}.')
+            line.save(update_fields=['adjustment'])
+
+
 @transaction.atomic
 def review_inventory_sheet(sheet, *, actor, approve, note=''):
-    _require_actor(actor)
+    """Подтвердить или отклонить ведомость одним контролёром в одной транзакции."""
+    require_operation_actor(actor, 'Для операции нужен автор.')
     try:
         sheet = InventorySheet.objects.select_for_update().get(pk=sheet.pk)
     except InventorySheet.DoesNotExist as error:
@@ -71,34 +103,7 @@ def review_inventory_sheet(sheet, *, actor, approve, note=''):
         raise ValidationError('Укажите причину отклонения.')
 
     if approve:
-        lines = list(sheet.lines.select_related('count').order_by('count__stock_id', 'pk'))
-        if not lines:
-            raise ValidationError('Ведомость не содержит позиций.')
-        stocks = _lock_stocks([line.count.stock_id for line in lines])
-        latest_counts = dict(
-            InventoryCount.objects.filter(stock_id__in=stocks)
-            .exclude(sheet_line__sheet__status=InventorySheet.Status.REJECTED)
-            .order_by().values('stock_id').annotate(latest=Max('pk')).values_list('stock_id', 'latest')
-        )
-        for line in lines:
-            count = line.count
-            stock = stocks.get(count.stock_id)
-            if (
-                stock is None or latest_counts.get(count.stock_id) != count.pk
-                or stock_version(stock) != line.stock_revision
-            ):
-                raise ValidationError(
-                    f'Данные позиции «{count.stock_label}» изменились после пересчёта. '
-                    'Отклоните ведомость и создайте новую.',
-                )
-        for line in lines:
-            count = line.count
-            stock = stocks[count.stock_id]
-            update_inventory_summary(stock, count)
-            if count.difference:
-                stock.actual_balance = count.counted_quantity
-                line.adjustment = record_manual_stock(stock, actor=actor, reason=f'По ведомости № {sheet.pk}.')
-                line.save(update_fields=['adjustment'])
+        _apply_sheet_counts(sheet, actor)
 
     sheet.status = InventorySheet.Status.APPROVED if approve else InventorySheet.Status.REJECTED
     sheet.reviewed_by = actor

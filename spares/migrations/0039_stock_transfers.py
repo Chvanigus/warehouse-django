@@ -1,3 +1,5 @@
+"""Документы передачи запчастей между складами."""
+
 from decimal import Decimal
 
 import django.core.validators
@@ -9,6 +11,7 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
+    """Создаёт модель перемещения с ограничениями на количество и склады."""
     dependencies = [
         ('spares', '0038_part_codes_and_minimums'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),

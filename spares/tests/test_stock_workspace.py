@@ -1,3 +1,5 @@
+"""Фильтры рабочего списка остатков и доступность действий в строках."""
+
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
@@ -9,8 +11,11 @@ from spares.models import Company, MeasureMeasurement, Spares, Stock, Warehouses
 
 
 class StockWorkspaceTests(TestCase):
+    """Проверяет фильтрацию, счётчики и ссылки операций над остатками."""
+
     @classmethod
     def setUpTestData(cls):
+        """Создаёт партии разных складов и фирм и пользователей с разными правами."""
         cls.reader = get_user_model().objects.create_user(username='stock-reader')
         cls.operator = get_user_model().objects.create_user(username='stock-operator')
         permissions = Permission.objects.filter(content_type__app_label='spares')
@@ -39,9 +44,11 @@ class StockWorkspaceTests(TestCase):
         )
 
     def setUp(self):
+        """Сохраняет адрес рабочего списка остатков."""
         self.url = reverse('spares:stock_report')
 
     def test_filters_combine_and_counts_describe_filtered_rows(self):
+        """Проверяет сочетание фильтров и подсчёт показателей по отобранным строкам."""
         self.client.force_login(self.reader)
         response = self.client.get(self.url, {
             'q': 'фильтр [a] флт',
@@ -56,11 +63,13 @@ class StockWorkspaceTests(TestCase):
         self.assertNotContains(response, 'Нет данных')
 
     def test_invalid_filters_and_no_matches_have_distinct_states(self):
+        """Проверяет сообщения для ошибочного запроса и отсутствия результатов."""
         self.client.force_login(self.reader)
         self.assertContains(self.client.get(self.url, {'warehouse': 'invalid'}), 'Проверьте фильтры')
         self.assertContains(self.client.get(self.url, {'q': 'Неизвестно'}), 'Подходящих позиций нет')
 
     def test_action_links_require_permissions_and_positive_stock(self):
+        """Проверяет права действий и доступность списания при положительном остатке."""
         writeoff_url = reverse('operations:writeoff_add')
         edit_url = reverse('catalog:stock-edit', args=[self.match.pk])
         self.client.force_login(self.reader)

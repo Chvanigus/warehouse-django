@@ -1,3 +1,5 @@
+"""Маршруты накладных, импорта строк из XLSX и скачивания шаблона."""
+
 from django.urls import path
 
 from .invoice_views import (

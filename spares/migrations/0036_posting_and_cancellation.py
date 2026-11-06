@@ -1,3 +1,5 @@
+"""Дата проведения и отметки отмены складских документов."""
+
 import django.db.models.deletion
 import django.utils.timezone
 from django.conf import settings
@@ -7,6 +9,7 @@ import spares.validators
 
 
 class Migration(migrations.Migration):
+    """Добавляет сведения об отмене и валидаторы дат прихода и расхода."""
     dependencies = [
         ('spares', '0035_stock_adjustment'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),

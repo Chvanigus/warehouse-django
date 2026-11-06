@@ -1,3 +1,5 @@
+"""Датированные пересчёты и их связь с последующими операциями."""
+
 from datetime import timedelta
 from decimal import Decimal
 
@@ -13,8 +15,11 @@ from spares.models import Company, Contractors, InventoryCount, Receipt, Spares,
 
 
 class DatedInventoryTests(TestCase):
+    """Проверяет достоверность исторического среза и суммы приходного отчёта."""
+
     @classmethod
     def setUpTestData(cls):
+        """Создаёт складскую позицию и пользователя с доступом к пересчётам."""
         cls.company = Company.objects.create(name='Фирма')
         cls.warehouse = Warehouses.objects.create(name='Основной')
         cls.spare = Spares.objects.create(name='Фильтр')
@@ -26,12 +31,14 @@ class DatedInventoryTests(TestCase):
         ))
 
     def receipt(self, quantity, **kwargs):
+        """Проводит поступление в тестовом складе с заданным количеством."""
         return Receipt.objects.create(
             company=self.company, warehouse=self.warehouse, spare=self.spare, contractor=self.contractor,
             quantity=quantity, price=2, **kwargs,
         )
 
     def test_dated_count_does_not_follow_subsequent_movements(self):
+        """Проверяет сохранение данных пересчёта после нового прихода."""
         self.receipt(5)
         self.client.force_login(self.operator)
         stock = Stock.objects.get()
@@ -52,6 +59,7 @@ class DatedInventoryTests(TestCase):
         self.assertContains(self.client.get(report), 'Ведомость № 12')
 
     def test_stale_count_is_rejected_and_fractional_count_records_difference(self):
+        """Проверяет отказ для устаревшего пересчёта и точность дробного расхождения."""
         self.receipt(5)
         self.client.force_login(self.operator)
         stock = Stock.objects.get()
@@ -69,6 +77,7 @@ class DatedInventoryTests(TestCase):
         self.assertEqual(stock.actual_balance, 7)
 
     def test_future_receipt_has_no_effect_and_cancellation_excludes_amount_from_report(self):
+        """Проверяет отклонение будущего прихода и исключение отменённой суммы из отчёта."""
         with self.assertRaisesMessage(ValidationError, 'Дата проведения не может быть в будущем'):
             self.receipt(5, date=timezone.localdate() + timedelta(days=1))
         self.assertFalse(Stock.objects.exists())

@@ -1,8 +1,7 @@
-from re import escape
+"""Журнал ручных корректировок, включая записи по инвентаризационным ведомостям."""
 
 from django import forms
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
-from django.db.models import Q
 from django.utils.functional import cached_property
 from django.views.generic import ListView
 
@@ -11,12 +10,14 @@ from .models import StockAdjustment
 
 
 class AdjustmentFilterForm(StockJournalFilterForm):
+    """Дополняет фильтры журнала ссылкой на отдельную корректировку."""
     entry = forms.IntegerField(
         label='Запись', required=False, min_value=1, max_value=2**63 - 1, widget=forms.HiddenInput,
     )
 
 
 class StockAdjustmentListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
+    """Показывает только доступный пользователю журнал с постраничным выводом."""
     model = StockAdjustment
     permission_required = 'spares.view_stockadjustment'
     template_name = 'spares/adjustments/list.html'
@@ -25,36 +26,22 @@ class StockAdjustmentListView(LoginRequiredMixin, PermissionRequiredMixin, ListV
 
     @cached_property
     def filters(self):
-        form = AdjustmentFilterForm(self.request.GET or None)
-        form.fields['q'].widget.attrs['placeholder'] = 'Запчасть, склад, автор или причина'
-        return form
+        """Связывает форму поиска корректировок с параметрами GET."""
+        return AdjustmentFilterForm(self.request.GET or None, search_hint='Запчасть, склад, автор или причина')
 
     def get_queryset(self):
+        """Выбирает корректировки по автору, причине, дате или складской позиции."""
         queryset = super().get_queryset().select_related('sheet_line')
-        if not self.filters.is_bound:
-            return queryset
-        if not self.filters.is_valid():
-            return queryset.none()
-
-        data = self.filters.cleaned_data
-        if data['q']:
-            pattern = escape(data['q'])
-            queryset = queryset.filter(
-                Q(stock_label__iregex=pattern) | Q(actor_name__iregex=pattern) | Q(reason__iregex=pattern),
-            )
-        if data['date_from']:
-            queryset = queryset.filter(created_at__date__gte=data['date_from'])
-        if data['date_to']:
-            queryset = queryset.filter(created_at__date__lte=data['date_to'])
-        if data['stock']:
-            queryset = queryset.filter(stock_id=data['stock'])
-        if data['entry']:
-            queryset = queryset.filter(pk=data['entry'])
-        return queryset
+        return self.filters.filter_queryset(
+            queryset, search_fields=('stock_label', 'actor_name', 'reason'),
+            date_field='created_at__date', exact_fields=(('stock', 'stock_id'), ('entry', 'pk')),
+        )
 
     def get_context_data(self, **kwargs):
+        """Передаёт фильтры и идентификаторы позиции и записи в шаблон."""
         context = super().get_context_data(**kwargs)
         context['filters'] = self.filters
-        context['stock_id'] = self.filters.cleaned_data.get('stock') if self.filters.is_valid() else None
-        context['entry_id'] = self.filters.cleaned_data.get('entry') if self.filters.is_valid() else None
+        data = self.filters.cleaned_data if self.filters.is_valid() else {}
+        context['stock_id'] = data.get('stock')
+        context['entry_id'] = data.get('entry')
         return context

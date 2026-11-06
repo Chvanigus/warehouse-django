@@ -1,11 +1,10 @@
-from re import escape
+"""Представления журналов, проведения и отмены прихода и списания."""
 
 from django import forms
 from django.contrib import messages
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import Q
 from django.http import HttpResponseRedirect
 from django.urls import reverse
 from django.utils import timezone
@@ -17,26 +16,32 @@ from .models import Receipt, Stock, WriteOff
 
 
 class OperationMixin(PermissionRequiredMixin):
+    """Связывает модель операции с правами, названием журнала и адресом возврата."""
     model = None
     permission_action = None
     list_title = ''
 
     @property
     def operation_name(self):
+        """Возвращает имя модели, используемое в маршрутах и кодах прав."""
         return self.model._meta.model_name
 
     def permission_for(self, action):
+        """Формирует код права Django для действия над операцией."""
         return f'spares.{action}_{self.operation_name}'
 
     def get_permission_required(self):
+        """Требует право на действие, заданное конкретным представлением."""
         return (self.permission_for(self.permission_action),)
 
     def get_success_url(self):
+        """Выбирает журнал операции или главную страницу согласно правам."""
         if self.request.user.has_perm(self.permission_for('view')):
             return reverse(f'operations:{self.operation_name}s')
         return reverse('spares:warehouse_main')
 
     def get_context_data(self, **kwargs):
+        """Передаёт название журнала, ссылку возврата и возможность отмены."""
         context = super().get_context_data(**kwargs)
         context['list_url'] = self.get_success_url()
         context['list_title'] = self.list_title
@@ -46,12 +51,14 @@ class OperationMixin(PermissionRequiredMixin):
 
 
 class OperationJournalFilterForm(JournalFilterForm):
+    """Дополняет диапазон дат точным фильтром по номеру записи."""
     entry = forms.IntegerField(
         label='Запись', min_value=1, max_value=2**63 - 1, required=False, widget=forms.HiddenInput,
     )
 
 
 class OperationListView(OperationMixin, ListView):
+    """Показывает журнал выбранной складской операции с поиском и навигацией."""
     permission_action = 'view'
     paginate_by = 30
     context_object_name = 'entries'
@@ -66,34 +73,18 @@ class OperationListView(OperationMixin, ListView):
 
     @cached_property
     def filters(self):
-        form = OperationJournalFilterForm(self.request.GET or None)
-        form.fields['q'].widget.attrs['placeholder'] = self.search_hint
-        return form
+        """Строит форму поиска с подсказкой для конкретного типа операции."""
+        return OperationJournalFilterForm(self.request.GET or None, search_hint=self.search_hint)
 
     def get_queryset(self):
+        """Загружает строки со связанными реквизитами и применяет фильтры."""
         queryset = super().get_queryset().select_related(*self.related_fields).order_by(*self.order_by)
-        if not self.filters.is_bound:
-            return queryset
-        if not self.filters.is_valid():
-            return queryset.none()
-        data = self.filters.cleaned_data
-        query = data['q']
-        if query:
-            # SQLite's case-insensitive LIKE only folds ASCII.
-            pattern = escape(query)
-            filters = Q()
-            for field in self.search_fields:
-                filters |= Q(**{f'{field}__iregex': pattern})
-            queryset = queryset.filter(filters)
-        if data['date_from']:
-            queryset = queryset.filter(**{f'{self.date_field}__gte': data['date_from']})
-        if data['date_to']:
-            queryset = queryset.filter(**{f'{self.date_field}__lte': data['date_to']})
-        if data['entry']:
-            queryset = queryset.filter(pk=data['entry'])
-        return queryset
+        return self.filters.filter_queryset(
+            queryset, search_fields=self.search_fields, date_field=self.date_field, exact_fields=(('entry', 'pk'),),
+        )
 
     def get_context_data(self, **kwargs):
+        """Передаёт шаблону текущую дату, фильтры и доступные операции."""
         context = super().get_context_data(**kwargs)
         context['filters'] = self.filters
         context['today'] = timezone.localdate()
@@ -107,13 +98,16 @@ class OperationListView(OperationMixin, ListView):
 
 
 class OperationEditMixin(OperationMixin):
+    """Проводит документ через форму и обрабатывает ошибки предметной области."""
     template_name = 'spares/operations/form.html'
 
     def post(self, request, *args, **kwargs):
+        """Объединяет проверку формы и проведение операции в одну транзакцию."""
         with transaction.atomic():
             return super().post(request, *args, **kwargs)
 
     def form_valid(self, form):
+        """Сохраняет документ и преобразует ошибки проведения в ошибки формы."""
         try:
             with transaction.atomic():
                 response = super().form_valid(form)
@@ -125,9 +119,11 @@ class OperationEditMixin(OperationMixin):
 
 
 class OperationCreateView(OperationEditMixin, CreateView):
+    """Создаёт приход или списание с проверкой права добавления."""
     permission_action = 'add'
 
     def get_initial(self):
+        """Подставляет текущую дату и при списании выбирает доступный остаток по ссылке."""
         initial = {**super().get_initial(), 'date': timezone.localdate()}
         if self.model is not WriteOff:
             return initial
@@ -142,13 +138,16 @@ class OperationCreateView(OperationEditMixin, CreateView):
 
 
 class PostedOperationRedirectView(OperationMixin, RedirectView):
+    """Перенаправляет со старого адреса редактирования проведённой операции."""
     permission_action = 'view'
 
     def get_redirect_url(self, *args, **kwargs):
+        """Возвращает адрес журнала, если пользователю разрешён его просмотр."""
         return self.get_success_url()
 
 
 class OperationCancellationForm(forms.Form):
+    """Запрашивает обязательную причину отмены документа."""
     reason = forms.CharField(
         label='Причина отмены', max_length=500,
         widget=forms.Textarea(attrs={'rows': 3, 'class': 'form-control'}),
@@ -156,21 +155,25 @@ class OperationCancellationForm(forms.Form):
 
 
 class OperationCancelView(OperationMixin, DeleteView):
+    """Отменяет проведённый документ с сохранением записи в журнале."""
     permission_action = 'delete'
     template_name = 'spares/operations/delete.html'
     form_class = OperationCancellationForm
     http_method_names = ['get', 'head', 'post', 'options']
 
     def get_permission_required(self):
+        """Требует одновременно просмотр и право отмены документа."""
         return (self.permission_for('view'), self.permission_for('delete'))
 
     def get_queryset(self):
+        """Исключает отменённые документы и строки накладных, отменяемые только вместе."""
         entries = super().get_queryset().filter(cancelled_at__isnull=True)
         if self.model is Receipt:
             entries = entries.filter(invoice_id__isnull=True)
         return entries
 
     def form_valid(self, form):
+        """Отменяет операцию и возвращает пользователя в журнал либо к ошибке формы."""
         try:
             self.object.cancel(actor=self.request.user, reason=form.cleaned_data['reason'])
         except ValidationError as error:

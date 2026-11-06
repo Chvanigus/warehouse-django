@@ -1,4 +1,4 @@
-"""Django settings for Warehouse."""
+"""Настройки склада для локального запуска и развёртывания в Docker."""
 
 import os
 from pathlib import Path
@@ -11,7 +11,9 @@ load_dotenv(BASE_DIR / '.env')
 
 
 def env_list(name, default=''):
-    return [value.strip() for value in os.getenv(name, default).split(',') if value.strip()]
+    """Читает значения переменной через запятую и убирает пробелы и пустые элементы."""
+    values = map(str.strip, os.getenv(name, default).split(','))
+    return [value for value in values if value]
 
 
 DEBUG = os.getenv('DEBUG') == '1'

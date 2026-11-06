@@ -70,11 +70,7 @@
           {% endfor %}
         </ol>
         {% if page_obj.has_other_pages %}
-          <nav class="operation-pagination" aria-label="Страницы истории движения">
-            {% if page_obj.has_previous %}<a class="btn btn-sm btn-outline-secondary" href="{% querystring page=page_obj.previous_page_number %}">Назад</a>{% endif %}
-            <span>Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span>
-            {% if page_obj.has_next %}<a class="btn btn-sm btn-outline-secondary" href="{% querystring page=page_obj.next_page_number %}">Далее</a>{% endif %}
-          </nav>
+          {% include 'spares/journal_pagination.html' with pagination_label='Страницы истории движения' %}
         {% endif %}
       {% else %}
         <p class="muted-copy p-4 mb-0">

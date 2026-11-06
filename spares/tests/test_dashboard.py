@@ -1,3 +1,5 @@
+"""Показатели склада и доступность действий на главной странице."""
+
 from datetime import date
 from unittest.mock import patch
 
@@ -10,7 +12,10 @@ from spares.models import Company, Contractors, Receipt, Spares, Stock, Warehous
 
 
 class DashboardTests(TestCase):
+    """Проверяет сводку поступлений и остатков с учётом разрешений."""
+
     def test_dashboard_shows_only_permitted_monthly_metrics(self):
+        """Проверяет подсчёт текущего месяца и сокрытие операций без права доступа."""
         user = get_user_model().objects.create_user('reader')
         user.user_permissions.add(*Permission.objects.filter(
             content_type__app_label='spares', codename__in=['view_receipt', 'view_stock'],

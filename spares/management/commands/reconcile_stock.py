@@ -1,3 +1,5 @@
+"""Поиск и объединение дубликатов складских остатков."""
+
 from django.core.exceptions import ValidationError
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
@@ -7,15 +9,19 @@ from spares.models import Stock
 
 
 class Command(BaseCommand):
+    """Команда Django для просмотра дубликатов и ручного объединения одного набора остатков."""
+
     help = 'Показывает дубли остатков или объединяет указанные записи одного остатка.'
 
     def add_arguments(self, parser):
+        """Добавить параметр со всеми номерами дубликатов, начиная с сохраняемого."""
         parser.add_argument(
             '--merge', nargs='+', type=int, metavar='ID',
             help='Укажите все ID одного остатка. Сохраняется запись с первым указанным ID.',
         )
 
     def handle(self, *args, **options):
+        """Вывести дубликаты или атомарно объединить указанную группу."""
         ids = options['merge']
         if ids is None:
             self.list_duplicates()
@@ -30,6 +36,7 @@ class Command(BaseCommand):
         self.stdout.write(f'Записи объединены. Сохранён остаток #{ids[0]}.')
 
     def list_duplicates(self):
+        """Показать дублирующиеся позиции со счётчиками, планом и результатом пересчёта."""
         groups = (
             Stock.objects.values(*Stock.key_fields)
             .annotate(count=Count('pk'))
@@ -52,6 +59,7 @@ class Command(BaseCommand):
             self.stdout.write('')
 
     def merge(self, ids):
+        """Сложить количества всей группы после проверки совместимости и удалить лишние записи."""
         retained = Stock.objects.select_for_update().filter(pk=ids[0]).first()
         if retained is None:
             raise CommandError(f'Остаток #{ids[0]} не найден.')

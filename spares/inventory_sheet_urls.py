@@ -1,3 +1,5 @@
+"""Маршруты списка, составления, просмотра и проверки ведомостей."""
+
 from django.urls import path
 
 from .inventory_sheet_views import (

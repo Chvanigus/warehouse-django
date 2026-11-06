@@ -1,3 +1,5 @@
+"""Артикулы запчастей и нормативы пополнения."""
+
 import django.core.validators
 import django.db.models.deletion
 from decimal import Decimal
@@ -6,6 +8,7 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
+    """Добавляет уникальный артикул и правила минимального остатка."""
     dependencies = [('spares', '0037_dated_inventory')]
 
     operations = [

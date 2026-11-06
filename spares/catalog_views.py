@@ -1,3 +1,5 @@
+"""Представления справочников и формы ручного изменения остатков."""
+
 import re
 
 from django.contrib import messages
@@ -31,13 +33,16 @@ CATALOGS = {
 
 
 def model_permission(model, action):
+    """Возвращает код права Django для операции над моделью склада."""
     return f'spares.{action}_{model._meta.model_name}'
 
 
 class CatalogIndexView(LoginRequiredMixin, TemplateView):
+    """Выводит справочники, которые пользователю разрешено просматривать."""
     template_name = 'spares/catalog/index.html'
 
     def get_context_data(self, **kwargs):
+        """Передаёт список доступных пользователю справочников."""
         context = super().get_context_data(**kwargs)
         context['catalogs'] = [
             (slug, model._meta.verbose_name_plural)
@@ -48,9 +53,11 @@ class CatalogIndexView(LoginRequiredMixin, TemplateView):
 
 
 class CatalogViewMixin(LoginRequiredMixin, PermissionRequiredMixin):
+    """Связывает маршрут справочника с его моделью, полями и правами."""
     action = 'view'
 
     def dispatch(self, request, *args, **kwargs):
+        """Подставляет модель по коду справочника перед проверкой доступа."""
         self.slug = kwargs['slug']
         try:
             self.model, self.fields = CATALOGS[self.slug]
@@ -59,14 +66,17 @@ class CatalogViewMixin(LoginRequiredMixin, PermissionRequiredMixin):
         return super().dispatch(request, *args, **kwargs)
 
     def get_permission_required(self):
+        """Возвращает право, требуемое для текущей операции."""
         return (model_permission(self.model, self.action),)
 
     def get_success_url(self):
+        """Выбирает доступную пользователю страницу возврата после операции."""
         if self.request.user.has_perm(model_permission(self.model, 'view')):
             return reverse('catalog:list', args=[self.slug])
         return reverse('catalog:index')
 
     def get_context_data(self, **kwargs):
+        """Добавляет название справочника и адрес возврата."""
         context = super().get_context_data(**kwargs)
         context.update(
             slug=self.slug,
@@ -76,11 +86,29 @@ class CatalogViewMixin(LoginRequiredMixin, PermissionRequiredMixin):
         return context
 
 
-class CatalogListView(CatalogViewMixin, ListView):
-    template_name = 'spares/catalog/list.html'
+class CatalogListingMixin(CatalogViewMixin):
+    """Добавляет пагинацию и разрешённые действия к спискам справочников."""
+
     paginate_by = 30
 
+    def get_context_data(self, **kwargs):
+        """Передаёт права добавления, изменения и удаления строк справочника."""
+        context = super().get_context_data(**kwargs)
+        context.update(
+            can_add=self.request.user.has_perm(model_permission(self.model, 'add')),
+            can_change=self.request.user.has_perm(model_permission(self.model, 'change')),
+            can_delete=self.request.user.has_perm(model_permission(self.model, 'delete')),
+        )
+        return context
+
+
+class CatalogListView(CatalogListingMixin, ListView):
+    """Показывает постраничный список строк справочника с поиском."""
+
+    template_name = 'spares/catalog/list.html'
+
     def get_queryset(self):
+        """Ищет по названию, артикулу или связанным полям назначения техники."""
         query = re.escape(self.request.GET.get('q', '').strip())
         queryset = super().get_queryset()
         if self.model is models.MachineWorker:
@@ -98,12 +126,10 @@ class CatalogListView(CatalogViewMixin, ListView):
         return queryset.filter(name__iregex=query) if query else queryset
 
     def get_context_data(self, **kwargs):
+        """Подготавливает колонки и действия для видимых строк справочника."""
         context = super().get_context_data(**kwargs)
         context.update(
             query=self.request.GET.get('q', ''),
-            can_add=self.request.user.has_perm(model_permission(self.model, 'add')),
-            can_change=self.request.user.has_perm(model_permission(self.model, 'change')),
-            can_delete=self.request.user.has_perm(model_permission(self.model, 'delete')),
             columns=[self.model._meta.get_field(field).verbose_name for field in self.fields],
             rows=[
                 (item.pk, [getattr(item, field) for field in self.fields])
@@ -113,16 +139,18 @@ class CatalogListView(CatalogViewMixin, ListView):
         return context
 
 
-class StockMinimumListView(CatalogViewMixin, ListView):
+class StockMinimumListView(CatalogListingMixin, ListView):
+    """Отображает правила минимума с количеством на складе и признаком дефицита."""
     template_name = 'spares/catalog/minimums.html'
     context_object_name = 'rules'
-    paginate_by = 30
 
     @cached_property
     def filters(self):
+        """Создаёт форму фильтров минимальных остатков из параметров GET."""
         return StockMinimumFilterForm(self.request.GET or None)
 
     def get_queryset(self):
+        """Считает доступное количество и ограничивает список правилами пополнения."""
         rules = super().get_queryset().with_available().select_related(
             'spare', 'company', 'warehouse', 'measure',
         ).order_by('spare__name', 'warehouse__name', 'company__name', 'pk')
@@ -132,52 +160,55 @@ class StockMinimumListView(CatalogViewMixin, ListView):
         return rules
 
     def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context.update(
-            filters=self.filters,
-            can_add=self.request.user.has_perm(model_permission(self.model, 'add')),
-            can_change=self.request.user.has_perm(model_permission(self.model, 'change')),
-            can_delete=self.request.user.has_perm(model_permission(self.model, 'delete')),
-        )
-        return context
+        """Передаёт фильтры в шаблон списка правил."""
+        return super().get_context_data(filters=self.filters, **kwargs)
 
 
 class CatalogFormMixin(CatalogViewMixin):
+    """Обеспечивает общий шаблон и атомарное сохранение записей справочника."""
     template_name = 'spares/catalog/form.html'
 
     def get_context_data(self, **kwargs):
+        """Передаёт заголовок формы в общий шаблон справочников."""
         return super().get_context_data(title=self.title, **kwargs)
 
     @transaction.atomic
     def post(self, request, *args, **kwargs):
+        """Проверяет и сохраняет форму справочника в одной транзакции."""
         return super().post(request, *args, **kwargs)
 
     def form_valid(self, form):
+        """Сохраняет запись и показывает уведомление об успехе."""
         response = super().form_valid(form)
         messages.success(self.request, 'Запись сохранена.')
         return response
 
 
 class CatalogCreateView(CatalogFormMixin, CreateView):
+    """Добавляет новую запись выбранного справочника при наличии права."""
     action = 'add'
     title = 'Добавление записи'
 
 
 class CatalogUpdateView(CatalogFormMixin, UpdateView):
+    """Изменяет существующую запись выбранного справочника."""
     action = 'change'
     title = 'Редактирование записи'
 
 
 class CatalogDeleteView(CatalogViewMixin, DeleteView):
+    """Подтверждает удаление записи и обрабатывает защищённые связи."""
     action = 'delete'
     template_name = 'spares/catalog/confirm_delete.html'
     http_method_names = ['get', 'head', 'post', 'options']
 
     @transaction.atomic
     def post(self, request, *args, **kwargs):
+        """Выполняет подтверждённое удаление в транзакции."""
         return super().post(request, *args, **kwargs)
 
     def form_valid(self, form):
+        """Удаляет запись либо объясняет, какие связи препятствуют удалению."""
         try:
             response = super().form_valid(form)
         except ProtectedError:
@@ -188,16 +219,19 @@ class CatalogDeleteView(CatalogViewMixin, DeleteView):
 
 
 class StockFormViewMixin(LoginRequiredMixin, PermissionRequiredMixin):
+    """Сохраняет ручные изменения остатка с записью автора и причины."""
     model = models.Stock
     form_class = ManualStockForm
     template_name = 'spares/catalog/form.html'
 
     def get_success_url(self):
+        """Возвращает пользователя к остаткам или списку справочников по его правам."""
         if self.request.user.has_perm('spares.view_stock'):
             return reverse('spares:stock_report')
         return reverse('catalog:index')
 
     def get_context_data(self, **kwargs):
+        """Помечает форму справочника как форму остатка и задаёт заголовок."""
         return super().get_context_data(
             title=self.title, catalog_name='Остатки', back_url=self.get_success_url(),
             stock_form=True, **kwargs,
@@ -205,9 +239,11 @@ class StockFormViewMixin(LoginRequiredMixin, PermissionRequiredMixin):
 
     @transaction.atomic
     def post(self, request, *args, **kwargs):
+        """Объединяет проверку формы и сохранение остатка в транзакцию."""
         return super().post(request, *args, **kwargs)
 
     def form_valid(self, form):
+        """Передаёт подготовленный остаток в сервис аудируемых изменений."""
         stock = form.save(commit=False)
         try:
             save_manual_stock(stock, actor=self.request.user, reason=form.cleaned_data['reason'])
@@ -220,14 +256,17 @@ class StockFormViewMixin(LoginRequiredMixin, PermissionRequiredMixin):
 
 
 class StockCreateView(StockFormViewMixin, CreateView):
+    """Создаёт позицию с начальным остатком и при необходимости причиной ввода."""
     permission_required = 'spares.add_stock'
     title = 'Начальный остаток'
 
 
 class StockUpdateView(StockFormViewMixin, UpdateView):
+    """Редактирует количество и план остатка с проверкой его версии."""
     form_class = StockCorrectionForm
     permission_required = 'spares.change_stock'
     title = 'Корректировка остатка'
 
     def get_context_data(self, **kwargs):
+        """Передаёт адрес перезагрузки формы после изменения остатка."""
         return super().get_context_data(reload_url=self.request.path, **kwargs)

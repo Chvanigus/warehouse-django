@@ -1,3 +1,5 @@
+"""Межскладские перемещения, их проведение, отмена и права доступа."""
+
 from datetime import timedelta
 from decimal import Decimal
 from unittest.mock import patch
@@ -14,8 +16,11 @@ from spares.transfer_models import StockTransfer, cancel_transfer, post_transfer
 
 
 class TransferTests(TestCase):
+    """Проверяет движение двух остатков и сохранность исходных документов."""
+
     @classmethod
     def setUpTestData(cls):
+        """Создаёт источник, получателя и исходный приход для проверки перемещения."""
         cls.actor = get_user_model().objects.create_user(username='operator')
         cls.company = Company.objects.create(name='Фирма')
         cls.source_warehouse = Warehouses.objects.create(name='Основной склад')
@@ -30,6 +35,7 @@ class TransferTests(TestCase):
         cls.source = Stock.matching(cls.receipt).get()
 
     def transfer(self, **overrides):
+        """Проводит тестовое перемещение с возможностью переопределить реквизиты."""
         data = {
             'source': self.source, 'destination': self.destination, 'quantity': '2.50',
             'date': timezone.localdate(), 'actor': self.actor, 'note': '  Для ремонта  ',
@@ -37,14 +43,17 @@ class TransferTests(TestCase):
         return post_transfer(**{**data, **overrides})
 
     def destination_stocks(self):
+        """Возвращает остатки запчасти на складе назначения."""
         return Stock.objects.filter(warehouse=self.destination, spare=self.spare)
 
     def grant(self, *codenames):
+        """Добавляет пользователю указанные разрешения модели перемещения."""
         self.actor.user_permissions.add(*Permission.objects.filter(
             content_type__app_label='spares', content_type__model='stocktransfer', codename__in=codenames,
         ))
 
     def test_transfer_preserves_receipt_and_merges_only_matching_identity(self):
+        """Проверяет сохранность прихода и объединение только с совпадающим остатком."""
         unrelated = Stock.objects.create(
             spare=self.spare, company=self.company, warehouse=self.destination,
             measure=self.measure, price=Decimal('48.00'), actual_balance=3,
@@ -66,6 +75,7 @@ class TransferTests(TestCase):
         self.assertEqual((transfer.actor_name, transfer.note), ('operator', 'Для ремонта'))
 
     def test_invalid_or_stale_requests_do_not_overdraw(self):
+        """Проверяет отказ для неверного запроса или устаревшего остатка без перерасхода."""
         with self.assertRaisesMessage(ValidationError, 'Дата проведения не может быть в будущем.'):
             self.transfer(date=timezone.localdate() + timedelta(days=1))
         with self.assertRaisesMessage(ValidationError, 'Выберите другой склад назначения.'):
@@ -80,6 +90,7 @@ class TransferTests(TestCase):
         self.assertEqual(StockTransfer.objects.count(), 1)
 
     def test_failed_document_save_rolls_back_both_balances(self):
+        """Проверяет откат обоих остатков при ошибке создания документа."""
         with patch.object(StockTransfer, 'save', side_effect=ValidationError('Ошибка записи')):
             with self.assertRaisesMessage(ValidationError, 'Ошибка записи'):
                 self.transfer()
@@ -89,6 +100,7 @@ class TransferTests(TestCase):
         self.assertFalse(StockTransfer.objects.exists())
 
     def test_cancellation_fails_if_destination_no_longer_has_quantity(self):
+        """Проверяет запрет отмены при недостатке количества на складе назначения."""
         transfer = self.transfer()
         third_warehouse = Warehouses.objects.create(name='Резерв')
         self.transfer(source=self.destination_stocks().get(), destination=third_warehouse, quantity=1)
@@ -103,6 +115,7 @@ class TransferTests(TestCase):
         self.assertEqual(self.destination_stocks().get().actual_balance, Decimal('1.50'))
 
     def test_cancellation_restores_balances_and_preserves_original_document(self):
+        """Проверяет возврат остатков и сохранение исходного документа и причины отмены."""
         transfer = self.transfer()
         self.client.force_login(self.actor)
         self.grant('view_stocktransfer')
@@ -133,6 +146,7 @@ class TransferTests(TestCase):
         self.assertEqual(StockTransfer.objects.count(), 1)
 
     def test_web_permissions_posting_and_read_only_history(self):
+        """Проверяет раздельные права на просмотр и проведение через веб-интерфейс."""
         self.client.force_login(self.actor)
         list_url = reverse('transfers:list')
         add_url = reverse('transfers:add')

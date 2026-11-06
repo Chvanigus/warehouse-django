@@ -1,9 +1,8 @@
-from re import escape
+"""Страницы перемещений между складами и обработка их отмены."""
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.core.exceptions import ValidationError
-from django.db.models import Q
 from django.http import HttpResponseRedirect
 from django.urls import reverse
 from django.utils.functional import cached_property
@@ -17,51 +16,41 @@ from .transfer_models import StockTransfer, cancel_transfer, post_transfer
 
 
 class TransferReadMixin(LoginRequiredMixin, PermissionRequiredMixin):
+    """Определяет право просмотра и набор связей для страниц перемещений."""
     permission_required = 'spares.view_stocktransfer'
     queryset = StockTransfer.objects.select_related('spare', 'company', 'measure', 'from_warehouse', 'to_warehouse')
 
 
 class TransferListView(TransferReadMixin, ListView):
+    """Показывает журнал перемещений с поиском и фильтрацией по датам."""
     template_name = 'spares/transfers/list.html'
     context_object_name = 'entries'
     paginate_by = 30
 
     @cached_property
     def filters(self):
-        form = JournalFilterForm(self.request.GET or None)
-        form.fields['q'].widget.attrs['placeholder'] = 'Запчасть, склад или автор'
-        return form
+        """Подготавливает форму поиска по запчасти, складу и автору."""
+        return JournalFilterForm(self.request.GET or None, search_hint='Запчасть, склад или автор')
 
     def get_queryset(self):
-        queryset = super().get_queryset()
-        if not self.filters.is_bound:
-            return queryset
-        if not self.filters.is_valid():
-            return queryset.none()
-
-        data = self.filters.cleaned_data
-        if data['q']:
-            pattern = escape(data['q'])
-            queryset = queryset.filter(
-                Q(spare__name__iregex=pattern) | Q(from_warehouse__name__iregex=pattern)
-                | Q(to_warehouse__name__iregex=pattern) | Q(actor_name__iregex=pattern),
-            )
-        if data['date_from']:
-            queryset = queryset.filter(date__gte=data['date_from'])
-        if data['date_to']:
-            queryset = queryset.filter(date__lte=data['date_to'])
-        return queryset
+        """Применяет поиск и включительные границы дат к перемещениям."""
+        return self.filters.filter_queryset(
+            super().get_queryset(), search_fields=('spare__name', 'from_warehouse__name', 'to_warehouse__name', 'actor_name'),
+        )
 
     def get_context_data(self, **kwargs):
+        """Передаёт активные фильтры в шаблон журнала."""
         return super().get_context_data(filters=self.filters, **kwargs)
 
 
 class TransferDetailView(TransferReadMixin, DetailView):
+    """Показывает реквизиты, количество и состояние одного перемещения."""
     template_name = 'spares/transfers/detail.html'
     context_object_name = 'transfer'
 
 
 class TransferCancelView(TransferReadMixin, DeleteView):
+    """Отменяет проведённое перемещение с обязательной причиной."""
     permission_required = ('spares.view_stocktransfer', 'spares.delete_stocktransfer')
     template_name = 'spares/transfers/cancel.html'
     context_object_name = 'transfer'
@@ -69,9 +58,11 @@ class TransferCancelView(TransferReadMixin, DeleteView):
     http_method_names = ['get', 'head', 'post', 'options']
 
     def get_queryset(self):
+        """Оставляет только перемещения, которые ещё можно отменить."""
         return super().get_queryset().filter(cancelled_at__isnull=True)
 
     def form_valid(self, form):
+        """Передаёт отмену в сервис и показывает актуальный документ."""
         try:
             self.object = cancel_transfer(
                 self.object, actor=self.request.user, reason=form.cleaned_data['reason'],
@@ -84,11 +75,13 @@ class TransferCancelView(TransferReadMixin, DeleteView):
 
 
 class TransferCreateView(LoginRequiredMixin, PermissionRequiredMixin, FormView):
+    """Проводит перемещение по валидной форме и сообщает его номер."""
     permission_required = 'spares.add_stocktransfer'
     template_name = 'spares/transfers/form.html'
     form_class = TransferForm
 
     def get_initial(self):
+        """Подставляет исходную позицию с положительным остатком при переходе по ссылке."""
         initial = super().get_initial()
         stock_id = self.request.GET.get('stock', '')
         if stock_id.isdecimal() and len(stock_id) <= 18:
@@ -98,6 +91,7 @@ class TransferCreateView(LoginRequiredMixin, PermissionRequiredMixin, FormView):
         return initial
 
     def form_valid(self, form):
+        """Передаёт данные в сервис перемещений и показывает результат проведения."""
         try:
             self.transfer = post_transfer(actor=self.request.user, **form.cleaned_data)
         except ValidationError as error:
@@ -107,6 +101,7 @@ class TransferCreateView(LoginRequiredMixin, PermissionRequiredMixin, FormView):
         return super().form_valid(form)
 
     def get_success_url(self):
+        """Открывает проведённый документ или главную страницу согласно правам."""
         if self.request.user.has_perm('spares.view_stocktransfer'):
             return reverse('transfers:detail', args=[self.transfer.pk])
         return reverse('spares:warehouse_main')

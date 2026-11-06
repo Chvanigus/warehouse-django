@@ -1,3 +1,5 @@
+"""Маршруты журнала, проведения, просмотра и отмены перемещения."""
+
 from django.urls import path
 
 from .transfer_views import TransferCancelView, TransferCreateView, TransferDetailView, TransferListView

@@ -1,3 +1,5 @@
+"""Маршруты просмотра журнала и регистрации пересчёта одной позиции."""
+
 from django.urls import path
 
 from .inventory_views import InventoryCountCreateView, InventoryCountListView

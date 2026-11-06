@@ -1,3 +1,5 @@
+"""Ручные корректировки остатков и неизменность их аудита."""
+
 from datetime import date
 from decimal import Decimal
 from unittest.mock import patch
@@ -14,8 +16,11 @@ from spares.stock_adjustments import save_manual_stock
 
 
 class StockAdjustmentServiceTests(TestCase):
+    """Проверяет границы аудита, снимки реквизитов и транзакционный откат."""
+
     @classmethod
     def setUpTestData(cls):
+        """Создаёт участников и справочники для ручных корректировок."""
         cls.actor = get_user_model().objects.create_user(username='storekeeper')
         cls.key = {
             'spare': Spares.objects.create(name='Фильтр'),
@@ -26,6 +31,7 @@ class StockAdjustmentServiceTests(TestCase):
         }
 
     def test_records_opening_and_correction_with_actor_and_position_snapshots(self):
+        """Проверяет аудит начального остатка и исправления со снимками автора и позиции."""
         stock = Stock(**self.key, actual_balance=Decimal('5.50'))
         start = timezone.now()
         save_manual_stock(stock, actor=self.actor, reason='  Начальная сверка  ')
@@ -54,6 +60,7 @@ class StockAdjustmentServiceTests(TestCase):
         self.assertIn('Фильтр', correction.stock_label)
 
     def test_metadata_and_normal_operations_are_not_manual_adjustments(self):
+        """Проверяет отсутствие ручного аудита для обычных документов и правок метаданных."""
         stock = save_manual_stock(Stock(**self.key), actor=self.actor, reason='')
         stock.plan = 'Проверить'
         stock.inventory = Decimal('3.50')
@@ -81,6 +88,7 @@ class StockAdjustmentServiceTests(TestCase):
         self.assertEqual((adjustment.before, adjustment.after), (3, Decimal('4.25')))
 
     def test_rejects_missing_reason_and_rolls_back_if_audit_insert_fails(self):
+        """Проверяет обязательность причины и откат остатка при ошибке аудита."""
         stock = Stock.objects.create(**self.key, actual_balance=5)
         stock.actual_balance = 2
         with self.assertRaisesMessage(ValidationError, 'Укажите причину изменения остатка'):

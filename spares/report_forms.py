@@ -1,4 +1,5 @@
-"""Validated month and object filters for warehouse reports."""
+"""Формы отчётов по периодам и фильтры складских позиций."""
+
 import calendar
 from datetime import date
 from re import escape
@@ -16,7 +17,9 @@ RUSSIAN_MONTHS = (
 
 
 class MonthField(forms.DateField):
+    """Хранит выбранный месяц как дату для построения границ отчёта."""
     def __init__(self, **kwargs):
+        """Настраивает формат месяца и соответствующий элемент HTML-формы."""
         super().__init__(
             input_formats=['%Y-%m'],
             widget=forms.DateInput(
@@ -28,6 +31,7 @@ class MonthField(forms.DateField):
 
     def to_python(self, value):
         # Bookmarks created by the previous date picker use «Январь 2025».
+        """Преобразует месяц из современного или прежнего русскоязычного формата."""
         if isinstance(value, str):
             parts = value.casefold().split()
             if len(parts) == 2 and parts[0] in RUSSIAN_MONTHS:
@@ -36,6 +40,7 @@ class MonthField(forms.DateField):
         return super().to_python(value)
 
     def bound_data(self, data, initial):
+        """Нормализует значение для отображения, сохраняя ошибочный ввод."""
         value = super().bound_data(data, initial)
         try:
             month = self.to_python(value)
@@ -45,13 +50,16 @@ class MonthField(forms.DateField):
 
 
 class ReportFilterForm(forms.Form):
+    """Формирует включительный диапазон от начала первого до конца последнего месяца."""
     start_date = MonthField(label='Начало периода')
     end_date = MonthField(label='Конец периода')
 
     def add_prefix(self, field_name):
+        """Сохраняет имена параметров URL с дефисами."""
         return super().add_prefix(field_name.replace('_', '-'))
 
     def clean(self):
+        """Проверяет порядок месяцев и вычисляет последний день периода."""
         data = super().clean()
         start, end = data.get('start_date'), data.get('end_date')
         if start and end:
@@ -63,6 +71,7 @@ class ReportFilterForm(forms.Form):
 
 
 class MachineReportForm(ReportFilterForm):
+    """Дополняет диапазон отчёта выбором техники."""
     field_order = ['machine']
     machine = forms.ModelChoiceField(
         queryset=Machines.objects.order_by('name', 'pk'),
@@ -72,6 +81,7 @@ class MachineReportForm(ReportFilterForm):
 
 
 class TrailersReportForm(ReportFilterForm):
+    """Дополняет диапазон отчёта выбором прицепа."""
     field_order = ['trailers']
     trailers = forms.ModelChoiceField(
         queryset=Trailers.objects.order_by('name', 'pk'),
@@ -81,6 +91,7 @@ class TrailersReportForm(ReportFilterForm):
 
 
 class ContractorsReportForm(ReportFilterForm):
+    """Дополняет диапазон отчёта выбором контрагента."""
     field_order = ['contractors']
     contractors = forms.ModelChoiceField(
         queryset=Contractors.objects.order_by('name', 'pk'),
@@ -90,6 +101,7 @@ class ContractorsReportForm(ReportFilterForm):
 
 
 class StockGroupFilterForm(forms.Form):
+    """Фильтрует остатки и правила пополнения по запчасти, складу и фирме."""
     q = forms.CharField(
         label='Запчасть или артикул',
         max_length=255,
@@ -114,6 +126,7 @@ class StockGroupFilterForm(forms.Form):
     )
 
     def filter_groups(self, queryset):
+        """Применяет буквальный поиск по названию и артикулу, а также точные фильтры."""
         if not self.is_bound:
             return queryset
         if not self.is_valid():
@@ -131,6 +144,7 @@ class StockGroupFilterForm(forms.Form):
 
 
 class StockFilterForm(StockGroupFilterForm):
+    """Дополняет фильтры остатков переключателем расхождений."""
     discrepancy = forms.BooleanField(
         label='Только расхождения',
         required=False,
@@ -139,6 +153,7 @@ class StockFilterForm(StockGroupFilterForm):
 
 
 class StockMinimumFilterForm(StockGroupFilterForm):
+    """Дополняет фильтры минимума переключателем дефицита."""
     low = forms.BooleanField(
         label='Только к пополнению',
         required=False,

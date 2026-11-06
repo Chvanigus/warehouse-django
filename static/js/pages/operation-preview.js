@@ -1,4 +1,5 @@
-(() => {
+/** Показывает предварительный расчёт складской операции рядом с формой. */
+(function initializeOperationPreview() {
   const form = document.querySelector('[data-operation-form]');
   if (!form || typeof BigInt !== 'function') return;
 
@@ -15,6 +16,7 @@
   const warning = form.querySelector('[data-preview-warning]');
   const integerFormat = new Intl.NumberFormat('ru-RU');
 
+  /** Переводит ввод с точкой или запятой в целое число сотых для точного расчёта. */
   function minorUnits(value) {
     const match = /^(-?)(\d*)(?:[.,](\d{1,2}))?$/.exec(value ?? '');
     if (!match || (!match[2] && !match[3])) return null;
@@ -22,6 +24,7 @@
     return match[1] ? -units : units;
   }
 
+  /** Форматирует число сотых по русской локали и при необходимости выводит две дробные цифры. */
   function display(units, fixed = false) {
     if (units === null) return '—';
     const absolute = units < 0n ? -units : units;
@@ -30,10 +33,12 @@
     return (units < 0n ? '−' : '') + integerFormat.format(absolute / 100n) + decimals;
   }
 
+  /** Добавляет единицу измерения к количеству, если значение и единица заданы. */
   function displayQuantity(units, measure) {
     return units === null || !measure ? display(units) : display(units) + ' ' + measure;
   }
 
+  /** Обновляет сумму, доступное количество и подсказку о превышении остатка. */
   function updatePreview() {
     const stock = stockField?.selectedOptions[0]?.dataset;
     let measure = stock?.measure || '';
@@ -60,7 +65,7 @@
 
   form.addEventListener('input', updatePreview);
   form.addEventListener('change', updatePreview);
-  // Select2 emits synthetic jQuery events when its choices are picked.
+  // При выборе значения Select2 отправляет событие через jQuery.
   if (window.jQuery) window.jQuery(form).on('change', 'select', updatePreview);
   updatePreview();
 })();

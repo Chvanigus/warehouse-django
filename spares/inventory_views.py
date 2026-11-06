@@ -1,5 +1,6 @@
+"""Страницы записи фактического количества и истории инвентаризационных пересчётов."""
+
 from decimal import Decimal
-from re import escape
 
 from django import forms
 from django.contrib import messages
@@ -7,19 +8,20 @@ from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMix
 from django.core import signing
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
 from django.utils.functional import cached_property
 from django.views.generic import FormView, ListView
 
-from .catalog_forms import STOCK_REVISION_SALT, stock_version, validate_stock_version
+from .catalog_forms import STOCK_REVISION_SALT, validate_stock_version
 from .forms import StockJournalFilterForm
 from .inventory_counts import record_inventory_count
 from .models import InventoryCount, Stock
+from .stock_adjustments import stock_version
 
 
 class InventoryCountForm(forms.Form):
+    """Принимает результат пересчёта и защищает форму от устаревшего остатка."""
     counted_quantity = forms.DecimalField(
         label='Количество по факту', min_value=Decimal('0.00'), max_digits=15, decimal_places=2,
     )
@@ -29,35 +31,45 @@ class InventoryCountForm(forms.Form):
     revision = forms.CharField(widget=forms.HiddenInput, required=False)
 
     def __init__(self, *args, stock, **kwargs):
+        """Подписывает состояние остатка перед открытием формы пересчёта."""
         super().__init__(*args, **kwargs)
         self.stock_revision = stock_version(stock)
         self.initial['revision'] = signing.dumps(self.stock_revision, salt=STOCK_REVISION_SALT)
 
     def clean_revision(self):
+        """Сравнивает присланную версию остатка с актуальной."""
         return validate_stock_version(self.cleaned_data['revision'], self.stock_revision)
 
 
 class InventoryCountCreateView(LoginRequiredMixin, PermissionRequiredMixin, FormView):
+    """Записывает фактическое количество для выбранной складской позиции."""
     permission_required = 'spares.add_inventorycount'
     template_name = 'spares/inventory/form.html'
     form_class = InventoryCountForm
 
     @cached_property
     def stock(self):
-        return get_object_or_404(Stock.objects.select_related('spare', 'warehouse', 'company', 'measure'),
-                                 pk=self.kwargs['pk'])
+        """Загружает складскую позицию и связанные реквизиты либо возвращает 404."""
+        return get_object_or_404(
+            Stock.objects.select_related('spare', 'warehouse', 'company', 'measure'),
+            pk=self.kwargs['pk'],
+        )
 
     def get_form_kwargs(self):
+        """Передаёт форме позицию для подписи и проверки её версии."""
         return {**super().get_form_kwargs(), 'stock': self.stock}
 
     def get_context_data(self, **kwargs):
+        """Передаёт выбранную складскую позицию в шаблон пересчёта."""
         return super().get_context_data(stock=self.stock, **kwargs)
 
     @transaction.atomic
     def post(self, request, *args, **kwargs):
+        """Выполняет проверку формы и запись пересчёта в одной транзакции."""
         return super().post(request, *args, **kwargs)
 
     def form_valid(self, form):
+        """Записывает пересчёт через сервис и выбирает доступную страницу возврата."""
         try:
             record_inventory_count(
                 self.stock, actor=self.request.user, counted_quantity=form.cleaned_data['counted_quantity'],
@@ -75,6 +87,7 @@ class InventoryCountCreateView(LoginRequiredMixin, PermissionRequiredMixin, Form
 
 
 class InventoryCountListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
+    """Показывает постраничную историю пересчётов и связь с ведомостью."""
     model = InventoryCount
     queryset = InventoryCount.objects.select_related('sheet_line__sheet')
     permission_required = 'spares.view_inventorycount'
@@ -84,31 +97,18 @@ class InventoryCountListView(LoginRequiredMixin, PermissionRequiredMixin, ListVi
 
     @cached_property
     def filters(self):
-        form = StockJournalFilterForm(self.request.GET or None)
-        form.fields['q'].widget.attrs['placeholder'] = 'Запчасть, склад, автор или примечание'
-        return form
+        """Создаёт форму поиска по истории пересчётов."""
+        return StockJournalFilterForm(self.request.GET or None, search_hint='Запчасть, склад, автор или примечание')
 
     def get_queryset(self):
-        entries = super().get_queryset()
-        if not self.filters.is_bound:
-            return entries
-        if not self.filters.is_valid():
-            return entries.none()
-        data = self.filters.cleaned_data
-        if data['q']:
-            pattern = escape(data['q'])
-            entries = entries.filter(
-                Q(stock_label__iregex=pattern) | Q(actor_name__iregex=pattern) | Q(note__iregex=pattern),
-            )
-        if data['date_from']:
-            entries = entries.filter(counted_at__date__gte=data['date_from'])
-        if data['date_to']:
-            entries = entries.filter(counted_at__date__lte=data['date_to'])
-        if data['stock']:
-            entries = entries.filter(stock_id=data['stock'])
-        return entries
+        """Ограничивает историю указанной позицией, текстом поиска и диапазоном дат."""
+        return self.filters.filter_queryset(
+            super().get_queryset(), search_fields=('stock_label', 'actor_name', 'note'),
+            date_field='counted_at__date', exact_fields=(('stock', 'stock_id'),),
+        )
 
     def get_context_data(self, **kwargs):
+        """Передаёт форму и выбранную складскую позицию в контекст журнала."""
         return super().get_context_data(
             filters=self.filters,
             stock_id=self.filters.cleaned_data.get('stock') if self.filters.is_valid() else None,

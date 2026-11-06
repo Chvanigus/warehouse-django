@@ -1,3 +1,5 @@
+"""Расчёт потребности в закупке и выгрузка списка по складам."""
+
 from decimal import Decimal
 from io import BytesIO
 
@@ -11,8 +13,11 @@ from spares.models import Company, MeasureMeasurement, Spares, Stock, StockMinim
 
 
 class PurchaseListTests(TestCase):
+    """Проверяет количество к заказу, фильтры и книгу XLSX."""
+
     @classmethod
     def setUpTestData(cls):
+        """Создаёт нормативы двух складов и пользователя с правами просмотра."""
         cls.viewer = get_user_model().objects.create_user(username='purchaser')
         cls.viewer.user_permissions.add(*Permission.objects.filter(
             content_type__app_label='spares', codename__in=['view_stock', 'view_stockminimum'],
@@ -30,19 +35,25 @@ class PurchaseListTests(TestCase):
         )
 
     def setUp(self):
+        """Сохраняет адреса списка и выгрузки и входит под пользователем закупок."""
         self.list_url = reverse('purchases:list')
         self.export_url = reverse('purchases:export')
         self.client.force_login(self.viewer)
 
     def make_stock(self, balance, price, **overrides):
+        """Создаёт ценовую партию с указанным остатком и реквизитами."""
         key = dict(spare=self.spare, warehouse=self.warehouse, company=self.company, measure=self.unit)
         return Stock.objects.create(**(key | overrides), actual_balance=Decimal(balance), price=price)
 
     def workbook(self, response):
+        """Открывает успешную выгрузку XLSX и регистрирует закрытие книги."""
         self.assertEqual(response.status_code, 200)
-        return load_workbook(BytesIO(b''.join(response.streaming_content)))
+        book = load_workbook(BytesIO(b''.join(response.streaming_content)))
+        self.addCleanup(book.close)
+        return book
 
     def test_shortages_group_lots_and_include_zero_stock(self):
+        """Проверяет суммирование ценовых партий и расчёт для отсутствующего остатка."""
         self.make_stock('0.75', 10)
         self.make_stock('3.40', 11)
         self.make_stock('20.00', 11, measure=None)
@@ -57,6 +68,7 @@ class PurchaseListTests(TestCase):
         self.assertContains(response, 'К заказу')
 
     def test_exact_minimum_and_company_filter(self):
+        """Проверяет исключение позиции ровно на минимуме и фильтрацию по фирме."""
         self.make_stock('6.25', 10)
         other_company = Company.objects.create(name='Вторая фирма')
         other_rule = StockMinimum.objects.create(
@@ -68,6 +80,7 @@ class PurchaseListTests(TestCase):
         self.assertFalse(filtered.context['shortages'])
 
     def test_filtered_workbook_uses_same_values_and_text_cells(self):
+        """Проверяет фильтры выгрузки и запись названий обычным текстом."""
         self.make_stock('4.15', 10)
         bad_name = Warehouses.objects.create(name='=Склад [/?]')
         bad_company = Company.objects.create(name='=1+1')
@@ -85,8 +98,6 @@ class PurchaseListTests(TestCase):
         self.assertEqual(list(filtered_book.active.values)[1], (
             'Основной', 'ПДШ-7', 'Подшипник', 'Фирма', 'шт.', 4.15, 6.25, 2.1,
         ))
-        filtered_book.close()
-
         full_book = self.workbook(self.client.get(self.export_url))
         self.assertEqual(len(full_book.sheetnames), 3)
         formula_sheet = next(sheet for sheet in full_book if sheet['A2'].value == bad_name.name)
@@ -96,9 +107,9 @@ class PurchaseListTests(TestCase):
         self.assertEqual(formula_sheet['D2'].value, bad_company.name)
         self.assertEqual(formula_sheet['H2'].data_type, 'n')
         self.assertEqual(formula_sheet['H2'].value, 5)
-        full_book.close()
 
     def test_export_includes_all_matching_pages(self):
+        """Проверяет включение всех отфильтрованных позиций вне зависимости от страницы."""
         for index in range(32):
             part = Spares.objects.create(name=f'Вкладыш {index:02d}')
             StockMinimum.objects.create(spare=part, warehouse=self.warehouse, company=self.company, minimum=1)
@@ -108,9 +119,9 @@ class PurchaseListTests(TestCase):
         self.assertEqual(len(response.context['shortages']), 30)
         workbook = self.workbook(self.client.get(self.export_url, params | {'page': 2}))
         self.assertEqual(workbook.active.max_row, 33)
-        workbook.close()
 
     def test_list_and_export_require_both_permissions(self):
+        """Проверяет оба права доступа и обработку неверного фильтра."""
         self.assertContains(self.client.get(self.list_url, {'warehouse': 0}), 'Исправьте отмеченные поля')
         self.assertEqual(self.client.get(self.export_url, {'warehouse': 0}).status_code, 400)
         for code in ('view_stock', 'view_stockminimum'):

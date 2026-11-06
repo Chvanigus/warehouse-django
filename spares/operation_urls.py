@@ -1,3 +1,5 @@
+"""Маршруты прихода, списания, старого журнала перемещений и отмены документов."""
+
 from django.urls import path
 
 from .forms import OperationReceiptForm, OperationWriteOffForm

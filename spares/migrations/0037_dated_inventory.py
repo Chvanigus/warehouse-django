@@ -1,3 +1,5 @@
+"""Снимки инвентаризационных пересчётов."""
+
 from decimal import Decimal
 
 import django.core.validators
@@ -7,6 +9,7 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
+    """Создаёт историю пересчётов и поле учётного количества на момент проверки."""
     dependencies = [('spares', '0036_posting_and_cancellation')]
 
     operations = [

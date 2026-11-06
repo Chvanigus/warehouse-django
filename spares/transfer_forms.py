@@ -1,3 +1,5 @@
+"""Форма перемещения доступного количества между складами."""
+
 from decimal import Decimal
 
 from django import forms
@@ -8,6 +10,7 @@ from .validators import validate_posting_date
 
 
 class TransferForm(forms.Form):
+    """Принимает исходную позицию, склад назначения и количество для перемещения."""
     source = forms.ModelChoiceField(
         queryset=Stock.objects.filter(actual_balance__gt=0).select_related(
             'spare', 'warehouse', 'company', 'measure',
@@ -34,6 +37,7 @@ class TransferForm(forms.Form):
     )
 
     def clean(self):
+        """Проверяет, что склады различаются и количества достаточно на исходном складе."""
         data = super().clean()
         source, destination, quantity = data.get('source'), data.get('destination'), data.get('quantity')
         if source is not None:

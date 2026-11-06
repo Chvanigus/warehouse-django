@@ -1,4 +1,4 @@
-"""Read-only movement history for one exact stock position."""
+"""Карточка истории движения конкретной складской позиции."""
 
 from django import forms
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
@@ -34,6 +34,7 @@ EVENTS = {
 
 
 class StockCardFilterForm(JournalFilterForm):
+    """Фильтрует движение по периоду и разрешённому типу операции."""
     q = None
     kind = forms.ChoiceField(
         label='Операция', required=False, widget=forms.Select(attrs={'class': 'form-select'}),
@@ -41,6 +42,7 @@ class StockCardFilterForm(JournalFilterForm):
     field_order = ('kind', 'date_from', 'date_to')
 
     def __init__(self, *args, allowed_groups, **kwargs):
+        """Ограничивает варианты фильтра группами операций, доступными пользователю."""
         super().__init__(*args, **kwargs)
         choices = [('', 'Все доступные операции')]
         choices.extend((group, POSTING_GROUPS[group][0]) for group in allowed_groups)
@@ -50,6 +52,7 @@ class StockCardFilterForm(JournalFilterForm):
 
 
 def _event_rows(queryset, kind, filters, *, timestamp=None, details=None):
+    """Приводит операции одной модели к общему набору полей для объединения запросов."""
     group = EVENTS[kind][2]
     if timestamp is not None:
         queryset = queryset.filter(**{f'{timestamp}__isnull': False})
@@ -74,6 +77,7 @@ def _event_rows(queryset, kind, filters, *, timestamp=None, details=None):
 
 
 def _movement_rows(stock, allowed_groups, filters):
+    """Объединяет разрешённые документы, отмены и корректировки в хронологическую выдачу."""
     key = Stock.key_for(stock)
     transfer_key = {field: value for field, value in key.items() if field != 'warehouse_id'}
     sources = {
@@ -104,6 +108,7 @@ def _movement_rows(stock, allowed_groups, filters):
 
 
 def _entry_data(row, stock):
+    """Вычисляет изменение количества и формирует ссылку на исходный документ."""
     label, sign, group = EVENTS[row['event_kind']]
     pk = row['event_pk']
     if row['invoice_pk']:
@@ -124,11 +129,13 @@ def _entry_data(row, stock):
 
 
 class StockCardView(LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
+    """Показывает остаток и постраничную историю движения согласно правам просмотра."""
     permission_required = 'spares.view_stock'
     template_name = 'spares/stock_card.html'
     paginate_by = 30
 
     def get_context_data(self, **kwargs):
+        """Загружает позицию, фильтры и страницу событий для карточки."""
         stock = get_object_or_404(
             Stock.objects.select_related('spare', 'company', 'warehouse', 'measure'),
             pk=self.kwargs['pk'],

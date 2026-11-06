@@ -52,6 +52,10 @@ $env:DEBUG = '1'
 .venv/Scripts/python.exe manage.py test
 ```
 
+У каждого модуля, класса, функции и метода в собственном Python-коде должен быть русскоязычный docstring. Описание должно объяснять назначение и важные условия работы. Тест `spares.tests.test_docstrings` проверяет это правило при локальном прогоне.
+
+Устройство складского учёта, транзакций и интерфейса описано в [README приложения склада](spares/README.md). Правила сохранения истории схемы собраны в [README миграций](spares/migrations/README.md).
+
 ## Развёртывание через Docker Compose
 
 1. Скопируйте `.env.example` в `.env` и заполните `SECRET_KEY` уникальным значением. Сгенерировать его можно командой `python -c "import secrets; print(secrets.token_urlsafe(64))"`.

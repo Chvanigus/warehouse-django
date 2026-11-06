@@ -1,3 +1,5 @@
+"""Настройка и границы стандартных ролей склада."""
+
 from io import StringIO
 
 from django.contrib.auth import get_user_model
@@ -12,8 +14,11 @@ from spares.models import Company, Spares, Stock, Warehouses
 
 
 class WarehouseRoleTests(TestCase):
+    """Проверяет применение групповых прав оператора и контролёра."""
+
     @classmethod
     def setUpTestData(cls):
+        """Создаёт участников без прав админки и контрольную позицию склада."""
         cls.operator = get_user_model().objects.create_user('operator')
         cls.controller = get_user_model().objects.create_user('controller')
         cls.stock = Stock.objects.create(
@@ -23,6 +28,7 @@ class WarehouseRoleTests(TestCase):
         )
 
     def test_standard_roles_allow_their_workflows(self):
+        """Проверяет, какие действия каждой роли доступны через веб-интерфейс."""
         call_command('configure_warehouse_roles', operator=['operator'], controller=['controller'], stdout=StringIO())
         edit_stock = reverse('catalog:stock-edit', args=[self.stock.pk])
 
@@ -43,6 +49,7 @@ class WarehouseRoleTests(TestCase):
         self.assertFalse(self.controller.is_staff)
 
     def test_reapplying_role_policy_removes_unexpected_group_privileges(self):
+        """Проверяет восстановление заданного набора разрешений при повторной настройке."""
         output = StringIO()
         call_command('configure_warehouse_roles', stdout=output)
         operator = Group.objects.get(name=OPERATOR_GROUP)
@@ -52,6 +59,7 @@ class WarehouseRoleTests(TestCase):
         self.assertFalse(operator.permissions.filter(pk=extra.pk).exists())
 
     def test_unknown_account_leaves_role_setup_atomic(self):
+        """Проверяет откат всех групп и назначений при неизвестной учётной записи."""
         with self.assertRaises(CommandError):
             call_command(
                 'configure_warehouse_roles', operator=['operator'], controller=['missing'], stdout=StringIO(),

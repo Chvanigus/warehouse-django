@@ -1,3 +1,5 @@
+"""Операции со справочниками и ручное изменение остатка через формы."""
+
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
@@ -9,16 +11,21 @@ from spares.models import Company, Spares, Stock, StockAdjustment, Warehouses
 
 
 class CatalogTests(TestCase):
+    """Проверяет доступ, защиту ссылок и аудит ручного учёта."""
+
     def setUp(self):
+        """Входит под обычным пользователем для каждого сценария."""
         self.user = get_user_model().objects.create_user('catalog-operator', password='test-pass')
         self.client.force_login(self.user)
 
     def grant(self, *codenames):
+        """Добавляет пользователю складские разрешения с указанными кодами."""
         self.user.user_permissions.add(*Permission.objects.filter(
             content_type__app_label='spares', codename__in=codenames,
         ))
 
     def test_catalog_workflow_without_staff_access(self):
+        """Проверяет создание, поиск, правку и удаление контрагента вне админки."""
         self.grant('view_contractors', 'add_contractors', 'change_contractors', 'delete_contractors')
         list_url = reverse('catalog:list', args=['contractors'])
         data = {'name': 'Снабжение', 'contact': '+7 123 456', 'contact_name': 'Иван'}
@@ -37,6 +44,7 @@ class CatalogTests(TestCase):
         self.assertNotContains(self.client.get(list_url), 'Снабжение')
 
     def test_permissions_apply_to_get_and_post(self):
+        """Проверяет отказ в открытии и отправке формы без права создания склада."""
         url = reverse('catalog:add', args=['warehouses'])
         self.assertEqual(self.client.get(url).status_code, 403)
         self.assertEqual(self.client.post(url, {'name': 'Основной'}).status_code, 403)
@@ -45,6 +53,7 @@ class CatalogTests(TestCase):
         self.assertRedirects(self.client.get(url), f"{reverse('spares:login')}?next={url}")
 
     def test_used_warehouse_cannot_be_deleted(self):
+        """Проверяет защиту склада, на который ссылается остаток."""
         self.grant('view_warehouses', 'delete_warehouses')
         warehouse = Warehouses.objects.create(name='Основной')
         Stock.objects.create(
@@ -57,6 +66,7 @@ class CatalogTests(TestCase):
         self.assertTrue(Warehouses.objects.filter(pk=warehouse.pk).exists())
 
     def test_stock_form_preserves_identity_and_counters(self):
+        """Проверяет неизменность склада и накопленных количеств при ручной корректировке."""
         self.grant('view_stock', 'add_stock', 'change_stock')
         warehouse = Warehouses.objects.create(name='Основной')
         other_warehouse = Warehouses.objects.create(name='Запасной')
@@ -92,6 +102,7 @@ class CatalogTests(TestCase):
         self.assertEqual(correction.reason, 'Пересчёт по ведомости')
 
     def test_stock_form_refuses_a_stale_balance(self):
+        """Проверяет защиту остатка от сохранения устаревшей формы."""
         self.grant('view_stock', 'change_stock')
         stock = Stock.objects.create(
             warehouse=Warehouses.objects.create(name='Основной'),
@@ -116,6 +127,7 @@ class CatalogTests(TestCase):
         self.assertFalse(StockAdjustment.objects.exists())
 
     def test_stock_form_requires_reason_only_when_balance_changes(self):
+        """Проверяет обязательность причины для изменения количества и свободную правку плана."""
         self.grant('view_stock', 'change_stock')
         stock = Stock.objects.create(
             warehouse=Warehouses.objects.create(name='Основной'),
@@ -138,6 +150,7 @@ class CatalogTests(TestCase):
         self.assertFalse(StockAdjustment.objects.exists())
 
     def test_admin_stock_edit_is_audited(self):
+        """Проверяет запись причины и автора корректировки из админки."""
         administrator = get_user_model().objects.create_superuser('stock-admin', password='test-pass')
         self.client.force_login(administrator)
         stock = Stock.objects.create(

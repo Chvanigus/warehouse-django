@@ -1,3 +1,5 @@
+"""Маршруты справочников, минимальных остатков и ручной корректировки."""
+
 from django.urls import path
 
 from . import catalog_views as views

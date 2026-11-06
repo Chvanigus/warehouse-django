@@ -1,9 +1,12 @@
+"""Многострочные приходные накладные."""
+
 import django.db.models.deletion
 from django.conf import settings
 from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
+    """Создаёт заголовок накладной и связывает его со строками прихода."""
     dependencies = [
         ('spares', '0039_stock_transfers'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),

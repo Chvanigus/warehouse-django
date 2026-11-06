@@ -1,3 +1,5 @@
+"""Веб-сценарии поступления, списания, отмены и просмотра журналов."""
+
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
@@ -13,8 +15,11 @@ from spares.models import (
 
 
 class WarehouseOperationTests(TestCase):
+    """Проверяет формы операций и разграничение прав между участниками."""
+
     @classmethod
     def setUpTestData(cls):
+        """Создаёт справочники, данные прихода и две роли для проверки доступа."""
         cls.spare = Spares.objects.create(name='Фильтр')
         cls.company = Company.objects.create(name='Организация')
         cls.warehouse = Warehouses.objects.create(name='Основной склад')
@@ -42,11 +47,13 @@ class WarehouseOperationTests(TestCase):
         ))
 
     def add_receipt(self):
+        """Отправляет корректную форму прихода и возвращает созданный документ."""
         response = self.client.post(reverse('operations:receipt_add'), self.receipt_data)
         self.assertRedirects(response, reverse('operations:receipts'))
         return Receipt.objects.get()
 
     def test_permissions_separate_read_and_write_access(self):
+        """Проверяет, что право просмотра прихода не даёт создавать документы."""
         receipt_list = reverse('operations:receipts')
         add_receipt = reverse('operations:receipt_add')
         self.assertEqual(self.client.get(receipt_list).status_code, 302)
@@ -57,6 +64,7 @@ class WarehouseOperationTests(TestCase):
         self.assertFalse(Receipt.objects.exists())
 
     def test_journal_combines_text_search_and_dates(self):
+        """Проверяет сочетание поиска и дат, ошибку периода и ссылку на отдельную запись."""
         self.client.force_login(self.operator)
         receipt = self.add_receipt()
         url = reverse('operations:receipts')
@@ -71,6 +79,7 @@ class WarehouseOperationTests(TestCase):
         self.assertNotContains(response, 'НК-200')
 
     def test_operator_can_create_and_cancel_receipt_without_overwriting_it(self):
+        """Проверяет отмену прихода с возвратом остатка и сохранением исходного документа."""
         self.client.force_login(self.operator)
         receipt = self.add_receipt()
         self.assertEqual(receipt.amount, Decimal('60.00'))
@@ -99,6 +108,7 @@ class WarehouseOperationTests(TestCase):
         self.assertContains(self.client.get(reverse('operations:receipts')), 'Ошибочная накладная')
 
     def test_writeoff_validation_and_cancellation(self):
+        """Проверяет доступное количество и возврат остатка при отмене списания."""
         self.client.force_login(self.operator)
         receipt = self.add_receipt()
         stock = Stock.objects.get()
@@ -138,6 +148,7 @@ class WarehouseOperationTests(TestCase):
         self.assertEqual(stock.actual_balance, Decimal('8'))
 
     def test_writeoff_from_stock_prefills_and_previews_available_quantity(self):
+        """Проверяет подстановку выбранной позиции и показ её количества и цены."""
         self.client.force_login(self.operator)
         self.add_receipt()
         stock = Stock.objects.get()
@@ -159,6 +170,7 @@ class WarehouseOperationTests(TestCase):
         self.assertRedirects(self.client.get(edit_url), reverse('operations:writeoffs'))
 
     def test_stock_form_keeps_existing_identity(self):
+        """Проверяет, что форма остатка принимает правку плана и сохраняет исходную позицию."""
         self.client.force_login(self.operator)
         self.add_receipt()
         stock = Stock.objects.get()
@@ -179,6 +191,7 @@ class WarehouseOperationTests(TestCase):
         self.assertEqual(updated.plan, 'Сверить')
 
     def test_admin_uses_shared_writeoff_form_and_searchable_assignments(self):
+        """Проверяет форму списания и поиск назначений техники в админке."""
         staff = get_user_model().objects.create_superuser(username='warehouse-admin')
         self.client.force_login(staff)
         receipt = self.add_receipt()

@@ -1,3 +1,5 @@
+"""Годовые отчёты по суммам прихода и расхода в разрезе фирм."""
+
 from decimal import Decimal
 
 from django.db.models import Sum
@@ -10,6 +12,7 @@ ZERO = Decimal('0.00')
 
 
 def _annual_report(model, amount_field):
+    """Суммировать проведённые операции по месяцам и годам, заполнив пустые месяцы нулями."""
     rows = (
         model.objects.filter(cancelled_at__isnull=True)
         .annotate(year=ExtractYear('date'), month=ExtractMonth('date'))
@@ -33,8 +36,10 @@ def _annual_report(model, amount_field):
 
 
 def get_income_report():
+    """Вернуть годовые отчёты по суммам приходов."""
     return _annual_report(Receipt, 'amount')
 
 
 def get_outcome_report():
+    """Вернуть годовые отчёты по суммам расходов."""
     return _annual_report(WriteOff, 'total_amount')

@@ -1,3 +1,5 @@
+"""Настройка стандартных групп оператора и контролёра склада."""
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
 from django.core.management.base import BaseCommand, CommandError
@@ -30,14 +32,18 @@ CONTROLLER_PERMISSIONS = READ_PERMISSIONS | {
 
 
 class Command(BaseCommand):
+    """Команда Django для назначения складских прав и добавления пользователей в группы."""
+
     help = 'Настроить стандартные права оператора и контролёра склада.'
 
     def add_arguments(self, parser):
+        """Добавить повторяемые параметры для назначения оператора и контролёра."""
         parser.add_argument('--operator', action='append', default=[], metavar='USER')
         parser.add_argument('--controller', action='append', default=[], metavar='USER')
 
     @transaction.atomic
     def handle(self, *args, **options):
+        """Проверить права после миграций и обновить группы и пользователей в одной транзакции."""
         permissions = {
             permission.codename: permission
             for permission in Permission.objects.filter(

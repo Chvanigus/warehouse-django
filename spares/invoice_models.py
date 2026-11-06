@@ -1,3 +1,5 @@
+"""Заголовок многострочной накладной поставщика."""
+
 from unicodedata import normalize
 
 from django.conf import settings
@@ -6,7 +8,7 @@ from django.db.models import Q
 
 
 class ReceiptInvoice(models.Model):
-    """A posted supplier invoice whose lines are the receipt ledger entries."""
+    """Проведённая накладная, каждая позиция которой записана как приход."""
 
     number = models.CharField(max_length=255, verbose_name='Номер накладной')
     number_key = models.CharField(max_length=255, editable=False)
@@ -25,6 +27,8 @@ class ReceiptInvoice(models.Model):
     cancellation_reason = models.CharField(max_length=500, blank=True, verbose_name='Причина отмены')
 
     class Meta:
+        """Задать порядок, права и уникальность номера действующей накладной в рамках фирмы и поставщика."""
+
         default_permissions = ()
         ordering = ('-date', '-pk')
         verbose_name = 'Многострочная накладная'
@@ -38,7 +42,9 @@ class ReceiptInvoice(models.Model):
 
     @staticmethod
     def normalize_number(number):
+        """Нормализовать Юникод, пробелы и регистр номера для проверки дубликатов."""
         return ' '.join(normalize('NFKC', number).split()).casefold()
 
     def __str__(self):
+        """Вернуть номер накладной для отображения в журналах."""
         return self.number

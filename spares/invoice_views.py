@@ -1,12 +1,13 @@
+"""Страницы накладных, загрузки XLSX, подтверждения проведения и отмены."""
+
 from decimal import Decimal, ROUND_HALF_UP
-from re import escape
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.core import signing
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
-from django.db.models import Count, Prefetch, Q, Sum
+from django.db.models import Count, Prefetch, Sum
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.functional import cached_property
@@ -27,6 +28,7 @@ PREVIEW_MAX_AGE = 20 * 60
 
 
 def _prepare_preview(actor, header, lines):
+    """Подписывает предпросмотр с автором и версией накладной для безопасного подтверждения."""
     return signing.dumps({
         'user': str(actor.pk),
         'version': invoice_version(header, ReceiptInvoice.normalize_number(header['number'])),
@@ -43,16 +45,20 @@ def _prepare_preview(actor, header, lines):
 
 
 def _header_values(form):
+    """Выделяет проверенные реквизиты накладной из данных формы."""
     return {name: form.cleaned_data[name] for name in HEADER_FIELDS}
 
 
 class InvoicePermissionMixin(LoginRequiredMixin, PermissionRequiredMixin):
+    """Подключает проверку прав и общий сценарий проведения накладной."""
     def redirect_after_posting(self, invoice):
+        """Открывает проведённую накладную или главную страницу согласно правам."""
         if self.request.user.has_perm('spares.view_receipt'):
             return redirect('invoices:detail', pk=invoice.pk)
         return redirect('spares:warehouse_main')
 
     def post_invoice(self, header, lines, error_form, *, preview_version=None):
+        """Передаёт накладную в сервис проведения и возвращает ошибки в форму."""
         try:
             invoice = post_receipt_invoice(
                 actor=self.request.user, header=header, lines=lines, preview_version=preview_version,
@@ -68,6 +74,7 @@ class InvoicePermissionMixin(LoginRequiredMixin, PermissionRequiredMixin):
 
 
 class InvoiceListView(InvoicePermissionMixin, ListView):
+    """Выводит накладные с числом строк и итоговой суммой."""
     permission_required = 'spares.view_receipt'
     template_name = 'spares/invoices/list.html'
     context_object_name = 'invoices'
@@ -78,31 +85,20 @@ class InvoiceListView(InvoicePermissionMixin, ListView):
 
     @cached_property
     def filters(self):
-        form = JournalFilterForm(self.request.GET or None)
-        form.fields['q'].widget.attrs['placeholder'] = 'Номер или поставщик'
-        return form
+        """Подготавливает фильтры по номеру, поставщику и датам."""
+        return JournalFilterForm(self.request.GET or None, search_hint='Номер или поставщик')
 
     def get_queryset(self):
-        queryset = super().get_queryset()
-        if not self.filters.is_bound:
-            return queryset
-        if not self.filters.is_valid():
-            return queryset.none()
-        data = self.filters.cleaned_data
-        if data['q']:
-            pattern = escape(data['q'])
-            queryset = queryset.filter(Q(number__iregex=pattern) | Q(contractor__name__iregex=pattern))
-        if data['date_from']:
-            queryset = queryset.filter(date__gte=data['date_from'])
-        if data['date_to']:
-            queryset = queryset.filter(date__lte=data['date_to'])
-        return queryset
+        """Ограничивает список накладных по реквизитам и периоду."""
+        return self.filters.filter_queryset(super().get_queryset(), search_fields=('number', 'contractor__name'))
 
     def get_context_data(self, **kwargs):
+        """Добавляет форму фильтров в контекст списка накладных."""
         return super().get_context_data(filters=self.filters, **kwargs)
 
 
 class InvoiceDetailView(InvoicePermissionMixin, DetailView):
+    """Показывает накладную с реквизитами и строками в исходном порядке."""
     permission_required = 'spares.view_receipt'
     template_name = 'spares/invoices/detail.html'
     context_object_name = 'invoice'
@@ -112,13 +108,16 @@ class InvoiceDetailView(InvoicePermissionMixin, DetailView):
 
 
 class InvoiceAddView(InvoicePermissionMixin, View):
+    """Принимает накладную, заполненную вручную на сайте."""
     permission_required = 'spares.add_receipt'
     template_name = 'spares/invoices/add.html'
 
     def get(self, request):
+        """Открывает пустые формы реквизитов и строк накладной."""
         return render(request, self.template_name, {'form': InvoiceHeaderForm(), 'lines': InvoiceLineFormSet()})
 
     def post(self, request):
+        """Проверяет реквизиты и строки, затем пытается провести накладную."""
         form, lines = InvoiceHeaderForm(request.POST), InvoiceLineFormSet(request.POST)
         header_valid = form.is_valid()
         lines_valid = lines.is_valid()
@@ -130,13 +129,16 @@ class InvoiceAddView(InvoicePermissionMixin, View):
 
 
 class InvoiceUploadView(InvoicePermissionMixin, View):
+    """Обрабатывает загрузку файла, предпросмотр и подтверждение накладной."""
     permission_required = 'spares.add_receipt'
     template_name = 'spares/invoices/upload.html'
 
     def get(self, request):
+        """Открывает форму реквизитов и выбора XLSX-файла."""
         return render(request, self.template_name, {'form': InvoiceUploadForm()})
 
     def post(self, request):
+        """Читает строки файла или передаёт запрос на подтверждение предпросмотра."""
         if 'confirmation' in request.POST:
             return self.confirm(request)
 
@@ -151,6 +153,7 @@ class InvoiceUploadView(InvoicePermissionMixin, View):
         return render(request, self.template_name, {'form': form})
 
     def preview(self, request, header, lines):
+        """Показывает рассчитанные суммы и подписывает данные для подтверждения."""
         preview_lines = [
             {**line, 'amount': (line['price'] * line['quantity']).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)}
             for line in lines
@@ -161,6 +164,7 @@ class InvoiceUploadView(InvoicePermissionMixin, View):
         })
 
     def confirm(self, request):
+        """Проверяет срок подписи и автора, повторно валидирует данные и проводит накладную."""
         try:
             payload = signing.loads(request.POST['confirmation'], salt=PREVIEW_SALT, max_age=PREVIEW_MAX_AGE)
             if payload['user'] != str(request.user.pk):
@@ -184,9 +188,11 @@ class InvoiceUploadView(InvoicePermissionMixin, View):
 
 
 class InvoiceTemplateView(InvoicePermissionMixin, View):
+    """Выдаёт пустой XLSX-шаблон для подготовки строк накладной."""
     permission_required = 'spares.add_receipt'
 
     def get(self, request):
+        """Возвращает книгу с корректным типом ответа и именем файла."""
         response = HttpResponse(
             make_invoice_workbook(),
             content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -196,14 +202,17 @@ class InvoiceTemplateView(InvoicePermissionMixin, View):
 
 
 class InvoiceCancelView(InvoicePermissionMixin, View):
+    """Запрашивает причину и разрешает отменить накладную пользователю с соответствующими правами."""
     permission_required = ('spares.view_receipt', 'spares.delete_receipt')
     template_name = 'spares/invoices/cancel.html'
 
     def get(self, request, pk):
+        """Показывает накладную и пустую форму причины отмены."""
         invoice = get_object_or_404(ReceiptInvoice, pk=pk)
         return render(request, self.template_name, {'invoice': invoice, 'form': InvoiceCancelForm()})
 
     def post(self, request, pk):
+        """Передаёт отмену в сервис и отображает результат либо ошибку."""
         invoice = get_object_or_404(ReceiptInvoice, pk=pk)
         form = InvoiceCancelForm(request.POST)
         if form.is_valid():

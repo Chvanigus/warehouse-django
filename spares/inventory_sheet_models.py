@@ -1,9 +1,15 @@
+"""Инвентаризационные ведомости и строки пересчётов."""
+
 from django.conf import settings
 from django.db import models
 
 
 class InventorySheet(models.Model):
+    """Ведомость одного склада с автором, результатом проверки и контролёром."""
+
     class Status(models.TextChoices):
+        """Состояния ведомости от подачи до подтверждения или отклонения."""
+
         PENDING = 'pending', 'На проверке'
         APPROVED = 'approved', 'Подтверждена'
         REJECTED = 'rejected', 'Отклонена'
@@ -24,6 +30,8 @@ class InventorySheet(models.Model):
     review_note = models.CharField(max_length=500, blank=True, verbose_name='Комментарий контролёра')
 
     class Meta:
+        """Настроить права и порядок отображения ведомостей."""
+
         default_permissions = ('add', 'view')
         permissions = [('approve_inventorysheet', 'Может проверять инвентаризационные ведомости')]
         ordering = ('-created_at', '-pk')
@@ -31,10 +39,13 @@ class InventorySheet(models.Model):
         verbose_name_plural = 'Инвентаризационные ведомости'
 
     def __str__(self):
+        """Вернуть подпись ведомости с её номером."""
         return f'Ведомость № {self.pk}'
 
 
 class InventorySheetLine(models.Model):
+    """Связь ведомости с пересчётом, версией остатка и возможной корректировкой."""
+
     sheet = models.ForeignKey(InventorySheet, on_delete=models.CASCADE, related_name='lines')
     count = models.OneToOneField('spares.InventoryCount', on_delete=models.PROTECT, related_name='sheet_line')
     stock_revision = models.JSONField(editable=False)
@@ -43,5 +54,7 @@ class InventorySheetLine(models.Model):
     )
 
     class Meta:
+        """Упорядочить строки ведомости и оставить права на уровне документа."""
+
         default_permissions = ()
         ordering = ('pk',)

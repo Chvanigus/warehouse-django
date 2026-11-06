@@ -1,3 +1,5 @@
+"""Доступ к журналу корректировок, фильтры и разбиение на страницы."""
+
 from datetime import datetime, timezone
 from decimal import Decimal
 from unittest.mock import patch
@@ -11,8 +13,11 @@ from spares.models import Company, Spares, Stock, StockAdjustment, Warehouses
 
 
 class AdjustmentJournalTests(TestCase):
+    """Проверяет просмотр корректировок остатков в интерфейсе."""
+
     @classmethod
     def setUpTestData(cls):
+        """Создаёт корректировки на границе московских суток и пользователей с разным доступом."""
         user_model = get_user_model()
         cls.reader = user_model.objects.create_user(username='stock-reader')
         cls.reviewer = user_model.objects.create_user(username='stock-reviewer')
@@ -42,16 +47,19 @@ class AdjustmentJournalTests(TestCase):
 
     @classmethod
     def make_entry(cls, stock, stock_label, reason, *, after=Decimal('12.25')):
+        """Создаёт запись корректировки с заданным итоговым количеством."""
         return StockAdjustment.objects.create(
             stock=stock, stock_label=stock_label, actor=cls.author, actor_name=cls.author.username,
             before=Decimal('15.00'), after=after, reason=reason,
         )
 
     def setUp(self):
+        """Сохраняет адреса журнала и списка остатков."""
         self.url = reverse('spares:stock_adjustments')
         self.stock_url = reverse('spares:stock_report')
 
     def test_separate_view_permission_and_read_only_page(self):
+        """Проверяет отдельное право просмотра и запрет записи через журнал."""
         self.assertRedirects(self.client.get(self.url), f"{reverse('spares:login')}?next={self.url}")
         self.client.force_login(self.reader)
         self.assertEqual(self.client.get(self.url).status_code, 403)
@@ -63,6 +71,7 @@ class AdjustmentJournalTests(TestCase):
         self.assertEqual(StockAdjustment.objects.count(), 3)
 
     def test_filters_use_local_date_and_match_literal_cyrillic(self):
+        """Проверяет московскую дату и буквальный поиск кириллицы со скобками."""
         self.client.force_login(self.reviewer)
         response = self.client.get(self.url, {
             'q': 'сверка [a]',
@@ -79,6 +88,7 @@ class AdjustmentJournalTests(TestCase):
         self.assertContains(self.client.get(self.url, {'stock': '-1'}), 'Проверьте фильтры')
 
     def test_pagination_keeps_filters_and_stable_order(self):
+        """Проверяет порядок записей с одинаковым временем и сохранение фильтра позиции."""
         self.client.force_login(self.reviewer)
         with patch('spares.adjustment_views.StockAdjustmentListView.paginate_by', 1):
             response = self.client.get(self.url, {'stock': self.stock.pk})

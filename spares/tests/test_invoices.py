@@ -1,3 +1,5 @@
+"""Ручные и импортированные накладные с несколькими строками."""
+
 from datetime import timedelta
 from decimal import Decimal
 from io import BytesIO
@@ -15,8 +17,11 @@ from spares.models import Company, Contractors, MeasureMeasurement, Receipt, Spa
 
 
 class InvoiceWorkflowTests(TestCase):
+    """Проверяет проведение, отмену и валидацию импорта XLSX."""
+
     @classmethod
     def setUpTestData(cls):
+        """Создаёт пользователя, поставщика, склады и позиции накладной."""
         cls.user = get_user_model().objects.create_superuser('invoice-operator')
         cls.company = Company.objects.create(name='Компания')
         cls.supplier = Contractors.objects.create(name='Поставщик')
@@ -26,6 +31,7 @@ class InvoiceWorkflowTests(TestCase):
         cls.measure = MeasureMeasurement.objects.create(name='шт.')
 
     def setUp(self):
+        """Входит в приложение и подготавливает реквизиты тестового документа."""
         self.client.force_login(self.user)
         self.header = {
             'number': 'РН-100', 'date': timezone.localdate().isoformat(), 'company': self.company.pk,
@@ -33,6 +39,7 @@ class InvoiceWorkflowTests(TestCase):
         }
 
     def line_data(self):
+        """Возвращает параметры формы со строками ручного прихода."""
         return {
             **self.header,
             'form-TOTAL_FORMS': '2', 'form-INITIAL_FORMS': '0',
@@ -43,6 +50,7 @@ class InvoiceWorkflowTests(TestCase):
         }
 
     def workbook(self, rows):
+        """Создаёт загружаемый файл XLSX из заданных строк."""
         book = Workbook()
         book.active.append(HEADERS)
         for row in rows:
@@ -53,6 +61,7 @@ class InvoiceWorkflowTests(TestCase):
         return SimpleUploadedFile('invoice.xlsx', file.getvalue())
 
     def test_manual_invoice_cancels_all_lines_and_preserves_the_document(self):
+        """Проверяет создание многострочной накладной и её отмену без потери строк."""
         add = reverse('invoices:add')
         response = self.client.post(add, self.line_data())
         invoice = ReceiptInvoice.objects.get()
@@ -78,6 +87,7 @@ class InvoiceWorkflowTests(TestCase):
         self.assertEqual(ReceiptInvoice.objects.filter(cancelled_at__isnull=True).count(), 1)
 
     def test_failed_cancellation_rolls_back_all_invoice_lines(self):
+        """Проверяет полный откат отмены при ошибке сторнирования одной из строк."""
         self.client.post(reverse('invoices:add'), self.line_data())
         invoice = ReceiptInvoice.objects.get()
         second_stock = Stock.objects.get(spare=self.second)
@@ -93,6 +103,7 @@ class InvoiceWorkflowTests(TestCase):
         self.assertEqual(Stock.objects.get(spare=self.first).actual_balance, Decimal('2.50'))
 
     def test_future_date_and_duplicate_legacy_number_are_rejected(self):
+        """Проверяет запрет будущей даты и повторного номера исторического прихода."""
         add = reverse('invoices:add')
         future = (timezone.localdate() + timedelta(days=1)).isoformat()
         self.assertContains(self.client.post(add, {**self.line_data(), 'date': future}), 'будущей датой')
@@ -105,6 +116,7 @@ class InvoiceWorkflowTests(TestCase):
         self.assertFalse(ReceiptInvoice.objects.exists())
 
     def test_import_preview_posts_only_after_confirmation_and_rechecks_duplicates(self):
+        """Проверяет проведение после подтверждения и повторную проверку номера."""
         upload = reverse('invoices:upload')
         workbook = self.workbook([('fl-1', 'масляный фильтр', 'шт.', '2,50', '4,00'), (None, 'Ремень', 'шт.', 3, 2)])
         preview = self.client.post(upload, {**self.header, 'workbook': workbook})
@@ -122,6 +134,7 @@ class InvoiceWorkflowTests(TestCase):
         self.assertEqual(ReceiptInvoice.objects.count(), 1)
 
     def test_formula_unknown_part_and_repeated_lines_are_rejected(self):
+        """Проверяет отказ для формулы, неизвестной запчасти и повторяющейся строки."""
         upload = reverse('invoices:upload')
         tests = [
             ([('FL-1', None, None, 1, '=1+2')], 'Замените формулы'),
@@ -135,6 +148,7 @@ class InvoiceWorkflowTests(TestCase):
         self.assertFalse(Stock.objects.exists())
 
     def test_import_requires_receipt_permission_and_template_is_xlsx(self):
+        """Проверяет права импорта и формат загружаемого шаблона."""
         response = self.client.get(reverse('invoices:template'))
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.content.startswith(b'PK'))

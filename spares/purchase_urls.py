@@ -1,3 +1,5 @@
+"""Маршруты просмотра списка закупок и выгрузки в XLSX."""
+
 from django.urls import path
 
 from .purchase_views import PurchaseExportView, PurchaseListView

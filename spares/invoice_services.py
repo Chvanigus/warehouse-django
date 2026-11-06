@@ -1,3 +1,5 @@
+"""Проверка, проведение и отмена накладных поставщиков."""
+
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
@@ -10,6 +12,7 @@ MAX_INVOICE_LINES = 100
 
 
 def validate_invoice_number(company, contractor, number):
+    """Вернуть ключ номера после проверки дубликатов среди действующих и старых документов."""
     number_key = ReceiptInvoice.normalize_number(number)
     if not number_key or len(number_key) > 255:
         raise ValidationError('Укажите номер накладной длиной до 255 символов.')
@@ -24,6 +27,7 @@ def validate_invoice_number(company, contractor, number):
 
 
 def validate_invoice_lines(lines):
+    """Проверить количество строк и запретить повтор сочетания запчасти, единицы и цены."""
     if not 1 <= len(lines) <= MAX_INVOICE_LINES:
         raise ValidationError(f'Добавьте от 1 до {MAX_INVOICE_LINES} строк.')
     seen = set()
@@ -35,6 +39,7 @@ def validate_invoice_lines(lines):
 
 
 def invoice_version(header, number_key):
+    """Вернуть номер последней записи накладной для проверки актуальности предпросмотра."""
     return ReceiptInvoice.objects.filter(
         company=header['company'], contractor=header['contractor'], number_key=number_key,
     ).order_by('-pk').values_list('pk', flat=True).first() or 0
@@ -42,6 +47,7 @@ def invoice_version(header, number_key):
 
 @transaction.atomic
 def post_receipt_invoice(*, actor, header, lines, preview_version=None):
+    """Сохранить накладную со всеми приходами после проверок даты, строк, номера и версии."""
     if header['date'] > timezone.localdate():
         raise ValidationError('Нельзя провести накладную будущей датой.')
     validate_invoice_lines(lines)
@@ -62,6 +68,7 @@ def post_receipt_invoice(*, actor, header, lines, preview_version=None):
 
 @transaction.atomic
 def cancel_receipt_invoice(*, pk, actor, reason):
+    """Отменить все приходы накладной и сохранить реквизиты отмены одной транзакцией."""
     invoice = ReceiptInvoice.objects.select_for_update().get(pk=pk)
     if invoice.cancelled_at is not None:
         raise ValidationError('Накладная уже отменена.')

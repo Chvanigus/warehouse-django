@@ -1,9 +1,12 @@
+"""Инвентаризационная ведомость и согласование пересчётов."""
+
 import django.db.models.deletion
 from django.conf import settings
 from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
+    """Создаёт ведомости и строки, связывающие пересчёт с ручной корректировкой."""
     dependencies = [
         ('spares', '0040_receipt_invoices'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),

@@ -1,12 +1,24 @@
+"""Сохранение ручных изменений остатков с записью в журнале."""
+
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 from django.db import router, transaction
 
 from .models import Stock, StockAdjustment
+from .validators import require_operation_actor
+
+
+def stock_version(stock):
+    """Собрать сериализуемый снимок остатка для проверки параллельных изменений."""
+    return [
+        stock.pk, str(stock.actual_balance), str(stock.input_quantity), str(stock.output_quantity),
+        stock.plan, str(stock.inventory), str(stock.inventory_book_balance),
+    ]
 
 
 def stock_identity_label(stock):
+    """Собрать подпись позиции, которая останется в истории после изменения справочников."""
     labels = [str(stock.spare), str(stock.warehouse), str(stock.company)]
     if stock.measure_id is not None:
         labels.append(str(stock.measure))
@@ -15,13 +27,13 @@ def stock_identity_label(stock):
 
 
 def save_manual_stock(stock, *, actor, reason):
-    """Сохранить ручной ввод остатка и историю изменения одной транзакцией."""
+    """Сохранить ручное изменение и вернуть запись остатка."""
     record_manual_stock(stock, actor=actor, reason=reason)
     return stock
 
 
 def record_manual_stock(stock, *, actor, reason):
-    """Вернуть связанную запись журнала, если остаток изменился."""
+    """Сохранить остаток и вернуть запись журнала, если количество изменилось."""
     using = router.db_for_write(Stock, instance=stock)
     opening = stock._state.adding
     with transaction.atomic(using=using):
@@ -44,8 +56,7 @@ def record_manual_stock(stock, *, actor, reason):
             if not reason:
                 raise ValidationError('Укажите причину изменения остатка.')
             reason = StockAdjustment._meta.get_field('reason').clean(reason, None)
-            if not getattr(actor, 'is_authenticated', False) or actor.pk is None:
-                raise ValidationError('Для корректировки остатка нужен автор.')
+            require_operation_actor(actor, 'Для корректировки остатка нужен автор.')
 
         stock.save(using=using, force_insert=opening)
         if before != after:
