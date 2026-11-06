@@ -100,6 +100,23 @@ class ContractorsReportForm(ReportFilterForm):
     )
 
 
+class AnnualReportFilterForm(forms.Form):
+    """Ограничивает годовую сводку фирмой, складом и календарным годом."""
+
+    year = forms.IntegerField(
+        label='Год', min_value=1, max_value=9999, required=False,
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Все годы'}),
+    )
+    company = forms.ModelChoiceField(
+        queryset=Company.objects.order_by('name', 'pk'), label='Фирма',
+        required=False, empty_label='Все фирмы', widget=forms.Select(attrs={'class': 'form-select'}),
+    )
+    warehouse = forms.ModelChoiceField(
+        queryset=Warehouses.objects.order_by('name', 'pk'), label='Склад',
+        required=False, empty_label='Все склады', widget=forms.Select(attrs={'class': 'form-select'}),
+    )
+
+
 class StockGroupFilterForm(forms.Form):
     """Фильтрует остатки и правила пополнения по запчасти, складу и фирме."""
     q = forms.CharField(

@@ -1,0 +1,111 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Оборот по запчастям{% endblock %}
+{% block extra_css %}
+  <link rel="stylesheet" href="{% static 'css/analytics.css' %}">
+  <link rel="stylesheet" href="{% static 'css/stock-workspace.css' %}">
+{% endblock %}
+
+{% block content %}
+  <main class="workspace analytics-workspace">
+    <header class="analytics-intro">
+      <div>
+        <p class="eyebrow mb-2">Отчёты и аналитика</p>
+        <h1>Оборот по запчастям</h1>
+        <p class="muted-copy mb-0">Количество и суммы по проведённым строкам прихода и списания.</p>
+      </div>
+      <div class="d-flex flex-wrap gap-2">
+        <a class="btn btn-outline-secondary" href="{% url 'spares:analytics' %}{% querystring q=None page=None %}">К аналитике</a>
+        {% if rows %}
+          <a class="btn btn-outline-primary" href="{% url 'spares:turnover_export' %}{% querystring page=None %}">Скачать XLSX</a>
+        {% endif %}
+      </div>
+    </header>
+
+    <section class="workspace-panel analytics-filters" aria-labelledby="turnover-filters">
+      <h2 id="turnover-filters">Параметры</h2>
+      <form method="get" action="{% url 'spares:turnover' %}">
+        {% if form.non_field_errors %}<div class="alert alert-danger" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+        <div class="analytics-filter-grid">
+          {% for field in form %}
+            <div>
+              <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+              {{ field }}
+              {% if field.errors %}<div class="text-danger small" role="alert">{{ field.errors }}</div>{% endif %}
+            </div>
+          {% endfor %}
+        </div>
+        <div class="analytics-filter-actions">
+          <button class="btn btn-primary" type="submit">Применить</button>
+          {% if form.is_bound %}<a class="btn btn-outline-secondary" href="{% url 'spares:turnover' %}">Сбросить</a>{% endif %}
+        </div>
+      </form>
+    </section>
+
+    {% if start %}
+      <section class="analytics-section" aria-labelledby="turnover-summary">
+        <div class="analytics-section-heading">
+          <h2 id="turnover-summary">Итоги периода</h2>
+          <span class="analytics-period">{{ start|date:'d.m.Y' }} — {{ end|date:'d.m.Y' }}</span>
+        </div>
+        <div class="analytics-kpis">
+          <article class="workspace-panel analytics-kpi analytics-kpi-receipt">
+            <span class="analytics-stat-icon">{% include 'include/icon.html' with name='in' only %}</span>
+            <h3>Сумма прихода</h3>
+            <strong>{{ receipts_total|floatformat:'2g' }}</strong>
+          </article>
+          <article class="workspace-panel analytics-kpi analytics-kpi-writeoff">
+            <span class="analytics-stat-icon">{% include 'include/icon.html' with name='out' only %}</span>
+            <h3>Сумма расхода</h3>
+            <strong>{{ writeoffs_total|floatformat:'2g' }}</strong>
+          </article>
+        </div>
+      </section>
+
+      <section class="workspace-panel analytics-panel" aria-labelledby="turnover-details">
+        <div class="analytics-panel-heading">
+          <h3 id="turnover-details">Запчасти за период</h3>
+          <p class="muted-copy">Разные единицы измерения одной запчасти показаны отдельными строками.</p>
+        </div>
+        {% if rows %}
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 stock-table" role="table">
+              <thead>
+                <tr>
+                  <th scope="col">Запчасть</th>
+                  <th scope="col">Единица</th>
+                  <th scope="col" class="text-end">Приход, количество</th>
+                  <th scope="col" class="text-end">Расход, количество</th>
+                  <th scope="col" class="text-end">Приход, сумма</th>
+                  <th scope="col" class="text-end">Расход, сумма</th>
+                </tr>
+              </thead>
+              <tbody role="rowgroup">
+                {% for row in rows %}
+                  <tr role="row">
+                    <th scope="row" role="rowheader">
+                      {{ row.name }}
+                      {% if row.sku %}<span class="d-block small muted-copy">{{ row.sku }}</span>{% endif %}
+                    </th>
+                    <td role="cell" data-label="Единица">{{ row.measure|default_if_none:"—" }}</td>
+                    <td role="cell" data-label="Приход, количество" class="stock-quantity text-end">{{ row.receipts_quantity|floatformat:'-2g' }}</td>
+                    <td role="cell" data-label="Расход, количество" class="stock-quantity text-end">{{ row.writeoffs_quantity|floatformat:'-2g' }}</td>
+                    <td role="cell" data-label="Приход, сумма" class="stock-quantity text-end">{{ row.receipts_amount|floatformat:'2g' }}</td>
+                    <td role="cell" data-label="Расход, сумма" class="stock-quantity text-end">{{ row.writeoffs_amount|floatformat:'2g' }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% if is_paginated %}
+            {% include 'spares/journal_pagination.html' with pagination_label='Страницы оборота' %}
+          {% endif %}
+        {% else %}
+          <p class="muted-copy mb-0">По выбранным параметрам операций нет.</p>
+        {% endif %}
+      </section>
+    {% elif form.errors %}
+      <p class="workspace-panel muted-copy p-4 mt-3">Исправьте отмеченные параметры и сформируйте отчёт ещё раз.</p>
+    {% endif %}
+  </main>
+{% endblock %}

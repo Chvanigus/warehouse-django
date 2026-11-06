@@ -13,6 +13,7 @@
         <th scope="col">Количество</th>
         <th scope="col">Цена</th>
         <th scope="col">Итого</th>
+        <th scope="col" class="no-export">Документ</th>
       </tr>
     </thead>
     <tbody>
@@ -27,9 +28,15 @@
           <td>{{ entry.quantity|floatformat:'2u' }}</td>
           <td>{{ entry.price|floatformat:'2u' }}</td>
           <td>{{ entry.amount|floatformat:'2u' }}</td>
+          <td>
+            {% if entry.invoice_id %}
+              <a href="{% url 'invoices:detail' entry.invoice_id %}">Накладная</a>
+            {% else %}
+              <a href="{% url 'operations:receipts' %}?entry={{ entry.pk }}">Приход</a>
+            {% endif %}
+          </td>
         </tr>
       {% endfor %}
     </tbody>
   </table>
-  {% if not report_data %}<noscript><p>За выбранный период поступлений нет.</p></noscript>{% endif %}
 {% endblock %}

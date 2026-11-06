@@ -3,16 +3,16 @@
 from io import BytesIO
 from itertools import groupby
 from operator import attrgetter
-from re import compile
 
 from openpyxl import Workbook
 from openpyxl.cell import WriteOnlyCell
 from openpyxl.styles import Font
 
+from .xlsx_cells import INVALID_XML_TEXT, text_cell
+
 
 HEADERS = ('Склад', 'Артикул', 'Запчасть', 'Фирма', 'Единица', 'На остатке', 'Минимум', 'К заказу')
 WIDTHS = (27, 21, 38, 26, 14, 14, 14, 14)
-INVALID_XML_TEXT = compile(r'[\x00-\x08\x0b-\x0c\x0e-\x1f\ud800-\udfff\ufffe\uffff]')
 SHEET_TITLE_TRANSLATION = str.maketrans({char: ' ' for char in '[]:*?/\\'})
 
 
@@ -36,13 +36,6 @@ def _sheet_title(warehouse):
     return (name[:31 - len(suffix)].rstrip() or 'Склад') + suffix
 
 
-def _text_cell(sheet, value):
-    """Записать текст без недопустимых символов и без преобразования в формулу."""
-    cell = WriteOnlyCell(sheet, value=INVALID_XML_TEXT.sub('', value))
-    cell.data_type = 's'
-    return cell
-
-
 def make_purchase_workbook(shortages):
     """Сформировать книгу с отдельным листом для каждого склада."""
     workbook = Workbook(write_only=True)
@@ -53,7 +46,7 @@ def make_purchase_workbook(shortages):
                 warehouse.name, row.spare.sku or '', row.spare.name,
                 row.company.name, row.measure.name if row.measure else '',
             )
-            sheet.append([_text_cell(sheet, value) for value in text_fields] + [
+            sheet.append([text_cell(sheet, value) for value in text_fields] + [
                 row.available, row.minimum, row.shortage,
             ])
     if not workbook.sheetnames:

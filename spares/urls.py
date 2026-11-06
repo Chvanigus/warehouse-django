@@ -4,7 +4,9 @@ from django.contrib.auth import views as auth_views
 from django.urls import path
 
 from spares.adjustment_views import StockAdjustmentListView
+from spares.analytics_views import AnalyticsView
 from spares.stock_card import StockCardView
+from spares.turnover_views import TurnoverExportView, TurnoverView
 from spares.views import (
     ContractorReportView,
     IncomeOutcomeReportView,
@@ -19,6 +21,9 @@ app_name = 'spares'
 
 urlpatterns = [
     path('', WarehouseMainView.as_view(), name='warehouse_main'),
+    path('analytics/', AnalyticsView.as_view(), name='analytics'),
+    path('analytics/turnover/', TurnoverView.as_view(), name='turnover'),
+    path('analytics/turnover/export/', TurnoverExportView.as_view(), name='turnover_export'),
     path('login/', auth_views.LoginView.as_view(
         template_name='warehouse/login.html',
     ), name='login'),

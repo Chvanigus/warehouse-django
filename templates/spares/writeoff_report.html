@@ -14,6 +14,7 @@
         <th scope="col">Списанное количество</th>
         <th scope="col">Цена</th>
         <th scope="col">Итого</th>
+        <th scope="col" class="no-export">Документ</th>
       </tr>
     </thead>
     <tbody>
@@ -29,9 +30,9 @@
           <td>{{ entry.quantity|floatformat:'2u' }}</td>
           <td>{{ entry.price|floatformat:'2u' }}</td>
           <td>{{ entry.total_amount|floatformat:'2u' }}</td>
+          <td><a href="{% url 'operations:writeoffs' %}?entry={{ entry.pk }}">Списание</a></td>
         </tr>
       {% endfor %}
     </tbody>
   </table>
-  {% if not report_data %}<noscript><p>За выбранный период списаний нет.</p></noscript>{% endif %}
 {% endblock %}

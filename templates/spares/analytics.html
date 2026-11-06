@@ -1,0 +1,169 @@
+{% extends 'base.html' %}
+{% load l10n static %}
+
+{% block title %}Аналитика склада{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/analytics.css' %}">{% endblock %}
+{% block extra_javascript %}<script src="{% static 'js/pages/analytics.js' %}"></script>{% endblock %}
+
+{% block content %}
+  <main class="workspace analytics-workspace">
+    <header class="analytics-intro">
+      <div>
+        <p class="eyebrow mb-2">Отчёты и аналитика</p>
+        <h1>Аналитика склада</h1>
+        <p class="muted-copy mb-0">Приход, расход и состояние запасов по складам.</p>
+      </div>
+      {% if show_receipts and show_writeoffs %}
+        <a class="btn btn-primary" href="{% url 'spares:turnover' %}{% querystring %}">Оборот по запчастям {% include 'include/icon.html' with name='arrow' only %}</a>
+      {% endif %}
+    </header>
+
+    <section class="workspace-panel analytics-filters" aria-labelledby="analytics-filters">
+      <h2 id="analytics-filters">Параметры</h2>
+      {% if period_presets %}
+        <nav class="analytics-presets" aria-label="Быстрый выбор периода">
+          {% for preset in period_presets %}
+            <a class="btn btn-sm btn-outline-secondary{% if ready and preset.start == period.start|date:'Y-m' and preset.end == period.end|date:'Y-m' %} active{% endif %}"
+               href="{% querystring start=preset.start end=preset.end %}"
+               {% if ready and preset.start == period.start|date:'Y-m' and preset.end == period.end|date:'Y-m' %}aria-current="true"{% endif %}>{{ preset.label }}</a>
+          {% endfor %}
+        </nav>
+      {% endif %}
+      <form method="get" action="{% url 'spares:analytics' %}">
+        {% if form.non_field_errors %}<div class="alert alert-danger" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+        <div class="analytics-filter-grid">
+          {% for field in form %}
+            {% if show_receipts or show_writeoffs or field.name != 'start' and field.name != 'end' %}
+              <div>
+                <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% if field.errors %}<div class="text-danger small" role="alert">{{ field.errors }}</div>{% endif %}
+              </div>
+            {% endif %}
+          {% endfor %}
+        </div>
+        <div class="analytics-filter-actions">
+          <button class="btn btn-primary" type="submit">Применить</button>
+          {% if form.is_bound %}<a class="btn btn-outline-secondary" href="{% url 'spares:analytics' %}">Сбросить</a>{% endif %}
+        </div>
+      </form>
+    </section>
+
+    {% if ready %}
+      {% if show_receipts or show_writeoffs %}
+        <section class="analytics-section" aria-labelledby="analytics-operations">
+          <div class="analytics-section-heading">
+            <div>
+              <p class="eyebrow mb-1">Движение за период</p>
+              <h2 id="analytics-operations">Приход и расход</h2>
+            </div>
+            <span class="analytics-period">{{ period.start|date:'d.m.Y' }} — {{ period.end|date:'d.m.Y' }}</span>
+          </div>
+          <div class="analytics-movement-grid">
+            <div class="analytics-kpis">
+              {% if show_receipts %}
+                <article class="workspace-panel analytics-kpi analytics-kpi-receipt">
+                  <span class="analytics-stat-icon">{% include 'include/icon.html' with name='in' only %}</span>
+                  <h3>Сумма прихода</h3>
+                  <strong>{{ receipts.amount|floatformat:'2g' }}</strong>
+                  <span class="muted-copy">Строк прихода · {{ receipts.count }}</span>
+                </article>
+              {% endif %}
+              {% if show_writeoffs %}
+                <article class="workspace-panel analytics-kpi analytics-kpi-writeoff">
+                  <span class="analytics-stat-icon">{% include 'include/icon.html' with name='out' only %}</span>
+                  <h3>Сумма расхода</h3>
+                  <strong>{{ writeoffs.amount|floatformat:'2g' }}</strong>
+                  <span class="muted-copy">Строк списания · {{ writeoffs.count }}</span>
+                </article>
+              {% endif %}
+            </div>
+            {% include 'spares/analytics_trend.html' %}
+          </div>
+          {% if show_writeoffs %}
+            <section class="workspace-panel analytics-panel" aria-labelledby="analytics-top-writeoffs">
+              <div class="analytics-panel-heading">
+                <h3 id="analytics-top-writeoffs">Наибольшие списания по сумме</h3>
+                <p class="muted-copy mb-0">До пяти запчастей с разбивкой по единицам измерения.</p>
+              </div>
+              <ol class="analytics-rank-list">
+                {% for item in top_writeoffs %}
+                  <li>
+                    <div class="analytics-rank-name"><strong>{{ item.name }}</strong>{% if item.sku %}<span class="muted-copy"> · {{ item.sku }}</span>{% endif %}</div>
+                    <strong class="analytics-rank-value">{{ item.amount|floatformat:'2g' }}</strong>
+                    <span class="muted-copy analytics-rank-quantity">{{ item.quantity|floatformat:'-2g' }} {{ item.measure|default:'без единицы измерения' }}</span>
+                    <div class="analytics-meter" aria-hidden="true"><span class="analytics-meter-writeoff" style="--meter: {{ item.height|unlocalize }}%"></span></div>
+                  </li>
+                {% empty %}
+                  <li class="analytics-rank-empty muted-copy">В выбранном периоде списаний нет.</li>
+                {% endfor %}
+              </ol>
+            </section>
+          {% endif %}
+        </section>
+      {% endif %}
+
+      {% if show_stock %}
+        <section class="analytics-section" aria-labelledby="analytics-stock">
+          <div class="analytics-section-heading">
+            <div>
+              <p class="eyebrow mb-1">Снимок на {{ snapshot_date|date:'d.m.Y' }}</p>
+              <h2 id="analytics-stock">Состояние запасов</h2>
+              <p class="muted-copy mb-0">Остатки показаны на текущий момент по выбранной фирме и складу.</p>
+            </div>
+            <a class="btn btn-outline-primary" href="{% url 'spares:stock_report' %}{% querystring start=None end=None %}">К остаткам</a>
+          </div>
+          <div class="analytics-kpis analytics-stock-kpis">
+            <article class="workspace-panel analytics-kpi"><h3>В наличии</h3><strong>{{ stock.in_stock }}</strong><span class="muted-copy">Позиций из {{ stock.positions }}</span></article>
+            <article class="workspace-panel analytics-kpi"><h3>Без остатка</h3><strong>{{ stock.unavailable }}</strong><span class="muted-copy">Нулевое или отрицательное количество</span></article>
+            <article class="workspace-panel analytics-kpi"><h3>С расхождениями</h3><strong>{{ stock.discrepancies }}</strong><a href="{% url 'spares:stock_report' %}{% querystring start=None end=None discrepancy=1 %}">К сверке остатков</a></article>
+            {% if show_minimums %}
+              <article class="workspace-panel analytics-kpi"><h3>Ниже минимума</h3><strong>{{ stock.below_minimum }}</strong><a href="{% url 'purchases:list' %}{% querystring start=None end=None %}">К списку закупок</a></article>
+            {% endif %}
+          </div>
+          <section class="workspace-panel analytics-panel" aria-labelledby="analytics-warehouses">
+            <div class="analytics-panel-heading">
+              <h3 id="analytics-warehouses">Позиции по складам</h3>
+              <p class="muted-copy mb-0">Длина полосы показывает число строк остатка на складе, цвет разделяет позиции в наличии и без остатка.</p>
+            </div>
+            <ol class="analytics-rank-list analytics-warehouse-list">
+              {% for warehouse in warehouses %}
+                <li>
+                  <div class="analytics-rank-name"><a href="{% url 'spares:stock_report' %}{% querystring start=None end=None warehouse=warehouse.id %}">{{ warehouse.name }}</a></div>
+                  <strong class="analytics-rank-value">{{ warehouse.positions }}</strong>
+                  <span class="muted-copy analytics-rank-quantity">В наличии {{ warehouse.in_stock }} · Без остатка {{ warehouse.unavailable }} · Расхождений {{ warehouse.discrepancies }}</span>
+                  <div class="analytics-meter" aria-hidden="true">
+                    <span style="--meter: {{ warehouse.in_stock_height|unlocalize }}%"></span>
+                    <span class="analytics-meter-unavailable" style="--meter: {{ warehouse.unavailable_height|unlocalize }}%"></span>
+                  </div>
+                </li>
+              {% empty %}
+                <li class="analytics-rank-empty muted-copy">Для выбранных параметров остатки отсутствуют.</li>
+              {% endfor %}
+            </ol>
+          </section>
+        </section>
+      {% endif %}
+    {% endif %}
+
+    <section class="analytics-section" aria-labelledby="analytics-reports">
+      <div class="analytics-section-heading"><h2 id="analytics-reports">Детальные отчёты</h2></div>
+      <div class="analytics-report-links">
+        {% if show_receipts and show_writeoffs %}
+          <a class="workspace-panel" href="{% url 'spares:turnover' %}{% querystring %}"><strong>Оборот по запчастям</strong><span>Количество и суммы по позициям за период</span></a>
+          <a class="workspace-panel" href="{% url 'spares:income_outcome_report' %}{% querystring start=None end=None %}"><strong>Годовая сводка</strong><span>Суммы прихода и расхода по месяцам и фирмам</span></a>
+        {% endif %}
+        {% if show_receipts %}
+          <a class="workspace-panel" href="{% url 'spares:contractor_report' %}"><strong>По контрагентам</strong><span>Поставки и суммы по выбранному поставщику</span></a>
+        {% endif %}
+        {% if show_writeoffs %}
+          <a class="workspace-panel" href="{% url 'spares:machine_report' %}"><strong>По технике</strong><span>Запчасти, списанные на выбранную машину</span></a>
+          <a class="workspace-panel" href="{% url 'spares:trailer_report' %}"><strong>По прицепам</strong><span>Расходы на выбранный прицеп</span></a>
+        {% endif %}
+        {% if show_stock %}
+          <a class="workspace-panel" href="{% url 'spares:stock_report' %}"><strong>Остатки запчастей</strong><span>Количество по складам, ценам и единицам</span></a>
+        {% endif %}
+      </div>
+    </section>
+  </main>
+{% endblock %}

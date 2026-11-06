@@ -1,0 +1,27 @@
+.report-kpis {
+  display: grid;
+  gap: .75rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+  margin-bottom: 1rem;
+}
+
+.report-kpis > div {
+  padding: .8rem 1rem;
+}
+
+.report-kpis dt {
+  color: var(--warehouse-muted);
+  font-size: .86rem;
+}
+
+.report-kpis dd {
+  font-size: clamp(1.1rem, 2.5vw, 1.5rem);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  margin: .15rem 0 0;
+}
+
+.report-state {
+  color: var(--warehouse-muted);
+  padding: 1rem 1.15rem;
+}

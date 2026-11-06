@@ -4,6 +4,7 @@ from decimal import Decimal
 
 from django.db.models import Sum
 from django.db.models.functions import ExtractMonth, ExtractYear
+from django.utils import timezone
 
 from spares.models import Receipt, WriteOff
 
@@ -11,11 +12,17 @@ from spares.models import Receipt, WriteOff
 ZERO = Decimal('0.00')
 
 
-def _annual_report(model, amount_field):
+def _annual_report(model, amount_field, *, year=None, company=None, warehouse=None):
     """Суммировать проведённые операции по месяцам и годам, заполнив пустые месяцы нулями."""
+    operations = model.objects.filter(cancelled_at__isnull=True, date__lte=timezone.localdate())
+    if year is not None:
+        operations = operations.filter(date__year=year)
+    if company is not None:
+        operations = operations.filter(company=company)
+    if warehouse is not None:
+        operations = operations.filter(warehouse=warehouse)
     rows = (
-        model.objects.filter(cancelled_at__isnull=True)
-        .annotate(year=ExtractYear('date'), month=ExtractMonth('date'))
+        operations.annotate(year=ExtractYear('date'), month=ExtractMonth('date'))
         .values('company_id', 'company__name', 'year', 'month')
         .annotate(amount=Sum(amount_field))
         .order_by('company__name', 'company_id', '-year', 'month')
@@ -35,11 +42,11 @@ def _annual_report(model, amount_field):
     return list(company_years.values())
 
 
-def get_income_report():
-    """Вернуть годовые отчёты по суммам приходов."""
-    return _annual_report(Receipt, 'amount')
+def get_income_report(**filters):
+    """Вернуть годовые суммы прихода в выбранной области склада."""
+    return _annual_report(Receipt, 'amount', **filters)
 
 
-def get_outcome_report():
-    """Вернуть годовые отчёты по суммам расходов."""
-    return _annual_report(WriteOff, 'total_amount')
+def get_outcome_report(**filters):
+    """Вернуть годовые суммы расхода в выбранной области склада."""
+    return _annual_report(WriteOff, 'total_amount', **filters)

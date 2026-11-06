@@ -1,5 +1,6 @@
-<section class="card card-body mb-3">
-  <h2 class="h5">{{ heading }}</h2>
+<section class="workspace-panel p-3 p-lg-4 mb-3">
+  <h2 class="h5 mb-3">{{ heading }}</h2>
+  {% if report %}
   <div class="table-responsive">
     <table class="table table-striped report-datatable" data-export-title="{{ heading }}">
       <thead>
@@ -21,6 +22,8 @@
         {% endfor %}
       </tbody>
     </table>
-    {% if not report %}<noscript><p>Данных пока нет.</p></noscript>{% endif %}
   </div>
+  {% else %}
+    <p class="muted-copy mb-0">По выбранным параметрам записей нет.</p>
+  {% endif %}
 </section>

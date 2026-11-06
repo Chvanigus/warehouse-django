@@ -8,9 +8,26 @@
       <div>
         <p class="eyebrow mb-2">Отчёты</p>
         <h1>Приход и расход в денежном выражении</h1>
+        <p class="muted-copy mt-2 mb-0">Действующие записи по месяцам и фирмам по сегодняшнюю дату.</p>
       </div>
+      <a class="btn btn-outline-secondary" href="{% url 'spares:analytics' %}">К аналитике</a>
     </div>
-    {% include 'spares/monthly_totals.html' with heading='Приход' report=income_report %}
-    {% include 'spares/monthly_totals.html' with heading='Расход' report=outcome_report %}
+    {% include 'spares/report_scope_form.html' %}
+    {% if ready %}
+      <dl class="report-kpis">
+        <div class="workspace-panel">
+          <dt>Сумма прихода</dt>
+          <dd>{{ income_total|floatformat:2 }}</dd>
+        </div>
+        <div class="workspace-panel">
+          <dt>Сумма расхода</dt>
+          <dd>{{ outcome_total|floatformat:2 }}</dd>
+        </div>
+      </dl>
+      {% include 'spares/monthly_totals.html' with heading='Приход' report=income_report %}
+      {% include 'spares/monthly_totals.html' with heading='Расход' report=outcome_report %}
+    {% else %}
+      <p class="workspace-panel report-state" role="alert">Исправьте отмеченные параметры и сформируйте отчёт ещё раз.</p>
+    {% endif %}
   </main>
 {% endblock %}

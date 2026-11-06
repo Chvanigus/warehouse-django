@@ -17,33 +17,45 @@
 {% block title %}{{ report_title }}{% endblock %}
 
 {% block content %}
-  <main class="container py-4">
-    <h1 class="h2 mb-3">{{ report_title }}</h1>
-    <form method="get" class="card card-body mb-4">
-      {{ form.non_field_errors }}
-      <div class="row g-3">
-        {% for field in form %}
-          <div class="col-md-4">
-            <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-            {{ field }}
-            {{ field.errors }}
+  <main class="workspace">
+    <div class="page-heading">
+      <div>
+        <p class="eyebrow mb-2">Отчёты</p>
+        <h1>{{ report_title }}</h1>
+        <p class="muted-copy mt-2 mb-0">Действующие записи за выбранные месяцы по сегодняшнюю дату.</p>
+      </div>
+      <a class="btn btn-outline-secondary" href="{% url 'spares:analytics' %}">К аналитике</a>
+    </div>
+    {% include 'spares/report_scope_form.html' %}
+    {% if not form.is_bound %}
+      <p class="workspace-panel report-state">Выберите объект и месяцы, чтобы увидеть сумму и документы.</p>
+    {% elif not form.is_valid %}
+      <p class="workspace-panel report-state" role="alert">Исправьте отмеченные параметры и сформируйте отчёт ещё раз.</p>
+    {% else %}
+      <section aria-labelledby="report-results-heading">
+        <h2 class="h5 mb-3" id="report-results-heading">Результаты · {{ report_subject }}</h2>
+        <dl class="report-kpis">
+          <div class="workspace-panel">
+            <dt>Выбранный период</dt>
+            <dd>{{ report_period.0|date:'m.Y' }} — {{ report_period.1|date:'m.Y' }}</dd>
           </div>
-        {% endfor %}
-      </div>
-      <div class="mt-3">
-        <button type="submit" class="btn btn-primary">Сформировать отчёт</button>
-        <a class="btn btn-outline-secondary" href="{{ request.path }}">Сбросить</a>
-      </div>
-    </form>
-    {% if form.is_valid %}
-      <div class="card card-body">
-        <div class="table-responsive">
-          {% block report_table %}{% endblock %}
-        </div>
-        {% if total_amount is not None %}
-          <p class="text-end mb-0">Итоговая сумма <strong>{{ total_amount|floatformat:2 }}</strong></p>
+          <div class="workspace-panel">
+            <dt>Строки операций</dt>
+            <dd>{{ entry_count }}</dd>
+          </div>
+          <div class="workspace-panel">
+            <dt>Итоговая сумма</dt>
+            <dd>{{ total_amount|default_if_none:0|floatformat:2 }}</dd>
+          </div>
+        </dl>
+        {% if entry_count %}
+          <div class="workspace-panel p-3">
+            <div class="table-responsive">{% block report_table %}{% endblock %}</div>
+          </div>
+        {% else %}
+          <p class="workspace-panel report-state">За выбранный период записей нет.</p>
         {% endif %}
-      </div>
+      </section>
     {% endif %}
   </main>
 {% endblock %}

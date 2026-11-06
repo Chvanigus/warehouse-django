@@ -1,5 +1,7 @@
 """Главная страница склада и представления отчётов."""
 
+from decimal import Decimal
+
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.db.models import Count, Q, Sum
 from django.utils import timezone
@@ -8,7 +10,13 @@ from django.views.generic import ListView, TemplateView
 
 from spares.context_processors.income_outcome_report import get_income_report, get_outcome_report
 from spares.models import Receipt, Stock, WriteOff
-from spares.report_forms import ContractorsReportForm, MachineReportForm, StockFilterForm, TrailersReportForm
+from spares.report_forms import (
+    AnnualReportFilterForm,
+    ContractorsReportForm,
+    MachineReportForm,
+    StockFilterForm,
+    TrailersReportForm,
+)
 from spares.threshold_models import StockMinimum
 
 
@@ -58,6 +66,7 @@ class FilteredReportView(WarehouseReportMixin, ListView):
         return (
             self.model.objects.filter(
                 date__range=data['date_range'],
+                date__lte=timezone.localdate(),
                 cancelled_at__isnull=True,
                 **{self.model_field: data[self.form_field]},
             )
@@ -66,12 +75,18 @@ class FilteredReportView(WarehouseReportMixin, ListView):
         )
 
     def get_context_data(self, **kwargs):
-        """Передаёт фильтры, заголовок и итоговую сумму отобранных документов."""
+        """Передаёт фильтры, выбранный объект, период и итоги отобранных документов."""
         context = super().get_context_data(**kwargs)
         context['form'] = self.form
         context['report_title'] = self.report_title
         if self.form.is_valid():
-            context['total_amount'] = self.object_list.aggregate(total=Sum(self.amount_field))['total']
+            totals = self.object_list.aggregate(total=Sum(self.amount_field), count=Count('pk'))
+            context.update(
+                report_subject=self.form.cleaned_data[self.form_field],
+                report_period=self.form.cleaned_data['date_range'],
+                total_amount=totals['total'],
+                entry_count=totals['count'],
+            )
         return context
 
 
@@ -159,9 +174,20 @@ class IncomeOutcomeReportView(WarehouseReportMixin, TemplateView):
     template_name = 'spares/income_outcome_report.html'
 
     def get_context_data(self, **kwargs):
-        """Передаёт месячные суммы двух сводок и русские подписи месяцев."""
+        """Проверяет область и передаёт месячные и общие суммы прихода и расхода."""
         context = super().get_context_data(**kwargs)
-        context['income_report'] = get_income_report()
-        context['outcome_report'] = get_outcome_report()
-        context['months'] = ('Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек')
+        form = AnnualReportFilterForm(self.request.GET or None)
+        ready = not form.is_bound or form.is_valid()
+        context.update(form=form, ready=ready)
+        if ready:
+            filters = form.cleaned_data if form.is_bound else {}
+            income_report = get_income_report(**filters)
+            outcome_report = get_outcome_report(**filters)
+            context.update(
+                income_report=income_report,
+                outcome_report=outcome_report,
+                income_total=sum((row['year_total'] for row in income_report), Decimal('0.00')),
+                outcome_total=sum((row['year_total'] for row in outcome_report), Decimal('0.00')),
+                months=('Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'),
+            )
         return context

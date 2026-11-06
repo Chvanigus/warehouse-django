@@ -1,0 +1,65 @@
+{% load l10n %}
+<figure class="workspace-panel analytics-panel analytics-trend" aria-labelledby="analytics-trend">
+  <figcaption class="analytics-panel-heading">
+    <h3 id="analytics-trend">Динамика по месяцам</h3>
+    <p class="muted-copy mb-0">Суммы по проведённым строкам. Отменённые операции исключены.</p>
+  </figcaption>
+  {% if trend_max %}
+    <div class="analytics-legend">
+      {% if show_receipts %}<span class="analytics-receipt-key">Приход</span>{% endif %}
+      {% if show_writeoffs %}<span class="analytics-writeoff-key">Расход</span>{% endif %}
+    </div>
+    <div class="analytics-chart-scroll" tabindex="0" aria-label="Столбчатый график по месяцам">
+      <div class="analytics-chart" style="--month-count: {{ trend|length }}">
+        <div class="analytics-axis" aria-hidden="true">
+          {% for tick in trend_ticks %}<span style="--level: {{ tick.height|unlocalize }}%">{{ tick.amount|floatformat:'-2g' }}</span>{% endfor %}
+        </div>
+        <div class="analytics-plot">
+          <div class="analytics-grid-lines" aria-hidden="true">
+            {% for tick in trend_ticks %}<span style="--level: {{ tick.height|unlocalize }}%"></span>{% endfor %}
+          </div>
+          <div class="analytics-months">
+            {% for month in trend %}
+              <div class="analytics-month">
+                <button class="analytics-bars" type="button" aria-pressed="false" data-chart-value
+                        aria-label="{{ month.label }}{% if show_receipts %} · Приход {{ month.receipts.amount|floatformat:'2g' }}{% endif %}{% if show_writeoffs %} · Расход {{ month.writeoffs.amount|floatformat:'2g' }}{% endif %}">
+                  {% if show_receipts %}
+                    <span class="analytics-bar analytics-bar-receipt{% if not month.receipts.amount %} analytics-bar-zero{% endif %}"
+                          style="--height: {{ month.receipts.height|unlocalize }}%" aria-hidden="true"></span>
+                  {% endif %}
+                  {% if show_writeoffs %}
+                    <span class="analytics-bar analytics-bar-writeoff{% if not month.writeoffs.amount %} analytics-bar-zero{% endif %}"
+                          style="--height: {{ month.writeoffs.height|unlocalize }}%" aria-hidden="true"></span>
+                  {% endif %}
+                </button>
+                <span class="analytics-month-label">{{ month.label }}</span>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="analytics-chart-selection muted-copy" data-chart-selection aria-live="polite">Выберите месяц, чтобы увидеть точные суммы.</p>
+  {% elif receipts.count or writeoffs.count %}
+    <p class="analytics-chart-selection muted-copy">Суммы операций за выбранный период равны нулю.</p>
+  {% else %}
+    <p class="analytics-chart-selection muted-copy">В выбранном периоде операций нет.</p>
+  {% endif %}
+  <details class="analytics-chart-table">
+    <summary>Значения по месяцам</summary>
+    <div class="table-responsive">
+      <table class="table align-middle mb-0">
+        <thead><tr><th scope="col">Месяц</th>{% if show_receipts %}<th scope="col" class="text-end">Сумма прихода</th>{% endif %}{% if show_writeoffs %}<th scope="col" class="text-end">Сумма расхода</th>{% endif %}</tr></thead>
+        <tbody>
+          {% for month in trend %}
+            <tr>
+              <th scope="row">{{ month.label }}</th>
+              {% if show_receipts %}<td class="text-end">{{ month.receipts.amount|floatformat:'2g' }}</td>{% endif %}
+              {% if show_writeoffs %}<td class="text-end">{{ month.writeoffs.amount|floatformat:'2g' }}</td>{% endif %}
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </details>
+</figure>
