@@ -1,5 +1,7 @@
 # Склад запчастей
 
+Версия 1.0.0. [Изменения](CHANGELOG.md) · [Проверка и выпуск версии](RELEASE.md).
+
 На главной странице видны позиции в наличии и последние операции. В разделе «Остатки» можно найти запчасть по названию или артикулу, отфильтровать позиции и скачать выборку в XLSX. Из строки остатка доступны списание, перемещение, пересчёт и история. В «Минимальных остатках» правила применяются к сумме всех ценовых партий одной запчасти, фирмы, склада и единицы измерения. Фильтр «Только к пополнению» показывает и правила для позиций с нулевым остатком.
 
 - **Приход.** Оформите накладную с одной или несколькими позициями. Для импорта скачайте шаблон из раздела «Накладные», заполните до 100 строк и загрузите файл. После предпросмотра оператор отправляет накладную на проверку, а проверяющий может провести её сразу.
@@ -11,21 +13,44 @@
 - **Список закупок.** Раздел «Закупки» показывает разницу между минимумом и доступным количеством. XLSX содержит отфильтрованные позиции на отдельных листах по складам.
 - **Аналитика.** Раздел показывает суммы прихода и расхода по месяцам, наибольшие списания и текущее состояние запасов. Для операций выберите период, фирму и склад. Снимок остатков относится к текущему моменту. Отчёт об обороте разбивает количества по запчастям и единицам измерения и выгружает выборку в XLSX.
 
-## Локальный запуск
+## Быстрый запуск через Docker Compose
 
-Нужен Python 3.13. Команды для PowerShell, из корня репозитория:
+Нужны Git и Docker с Compose v2 или новее; в Windows используйте Docker Desktop с Linux-контейнерами. Команды выполняются из корня репозитория. Python на хосте для этого способа не требуется.
 
-```powershell
-python -m venv .venv
-$env:DEBUG = '1'
-.venv/Scripts/python.exe -m pip install -r requirements.txt
-.venv/Scripts/python.exe manage.py migrate
-.venv/Scripts/python.exe manage.py configure_warehouse_roles
-.venv/Scripts/python.exe manage.py createsuperuser
-.venv/Scripts/python.exe manage.py runserver
+1. Скопируйте `.env.example` в `.env` (`Copy-Item .env.example .env` в PowerShell или `cp .env.example .env` в Bash). Заполните `SECRET_KEY` и `POSTGRES_PASSWORD` разными случайными значениями. Например, дважды выполните `docker run --rm python:3.13.18-slim-bookworm python -c "import secrets; print(secrets.token_urlsafe(64))"`. Файл `.env` не добавляется в Git.
+2. Запустите приложение и создайте первого администратора:
+
+   ```sh
+   docker compose config --quiet
+   docker compose up -d --build --wait
+   docker compose exec web python manage.py createsuperuser
+   ```
+
+3. Откройте [http://127.0.0.1:8000](http://127.0.0.1:8000) и войдите. Проверка готовности: [http://127.0.0.1:8000/healthz/](http://127.0.0.1:8000/healthz/). Пароль администратора задаётся интерактивно; готовых учётных записей в образе нет.
+
+Compose запускает PostgreSQL 17 (`db`), применяет миграции и создаёт складские роли в одноразовом сервисе `init`, затем поднимает Django через Gunicorn (`web`). Данные хранятся в именованном томе `warehouse-postgres-data`. База доступна внутри сети Compose, приложение публикуется только на `127.0.0.1`; порт приложения меняется через `WAREHOUSE_PORT` в `.env`.
+
+```sh
+docker compose ps -a
+docker compose logs --tail=100 web init db
+docker compose stop
+docker compose up -d --wait
 ```
 
-Откройте [http://127.0.0.1:8000](http://127.0.0.1:8000) и войдите. В Linux и macOS используйте `.venv/bin/python` и `export DEBUG=1`.
+Обычные `stop` и `down` сохраняют базу. **`docker compose down -v` удаляет том и данные PostgreSQL.** Перед обновлением сделайте резервную копию по [инструкции развёртывания](deploy/README.md).
+
+### Разработка и PyCharm
+
+Откройте каталог репозитория в PyCharm. Для автоматической перезагрузки Django при редактировании файлов используйте дополнительную конфигурацию:
+
+```sh
+docker compose -f compose.yaml -f compose.dev.yaml up -d --build --wait
+docker compose -f compose.yaml -f compose.dev.yaml exec web python manage.py createsuperuser
+```
+
+Она подключает исходники в контейнер, запускает `runserver` с `DEBUG=1` и открывает PostgreSQL на `127.0.0.1:5433` для подключения из IDE. Пользователь, пароль и имя БД берутся из `.env`; порт меняется через `WAREHOUSE_DB_PORT`. Все последующие команды для такого стенда выполняйте с обоими `-f`. После изменения зависимостей пересоберите образ. Этот режим предназначен для локальной разработки.
+
+Для боевого запуска используйте [отдельную инструкцию](deploy/README.md) и `.env.production.example`.
 
 В «Справочниках» заведите фирму, склад, запчасть и контрагента. Для списаний добавьте работника и запись в справочнике «Водители-транспорт-прицепы». Складская работа доступна с главной страницы. Войдите под первым администратором и создайте отдельную учётную запись для каждого сотрудника через «Управление».
 
@@ -45,7 +70,7 @@ $env:DEBUG = '1'
 
 Сотрудник может сменить пароль из меню своей учётной записи. Форма запрашивает текущий пароль и сохраняет текущий сеанс после смены.
 
-После миграций запустите `configure_warehouse_roles`, чтобы создать или обновить три группы. Для существующих учётных записей можно сразу назначить роли командой:
+В Compose сервис `init` создаёт и обновляет три складские группы после миграций. При запуске без Docker выполните `configure_warehouse_roles` вручную. Для существующих учётных записей можно сразу назначить роли командой:
 
 ```sh
 docker compose run --rm web python manage.py configure_warehouse_roles --operator operator --reviewer reviewer --admin warehouse_admin
@@ -53,33 +78,37 @@ docker compose run --rm web python manage.py configure_warehouse_roles --operato
 
 Назначение заменяет прежнюю складскую роль. Для существующих сотрудников проверьте индивидуальные права и другие группы в `/admin/`, поскольку Django складывает все выданные разрешения. «Управление» обслуживает обычные аккаунты с одной складской ролью. Системные и специально настроенные аккаунты обслуживаются через `/admin/`.
 
-## Локальные проверки
+## Проверки
 
-```powershell
-$env:DEBUG = '1'
-.venv/Scripts/python.exe -m pip check
-.venv/Scripts/python.exe manage.py check
-.venv/Scripts/python.exe manage.py makemigrations --check --dry-run
-.venv/Scripts/python.exe manage.py test
+После запуска проверьте готовность, страницу входа и загрузку CSS:
+
+```sh
+docker compose exec -T web python deploy/smoke.py
 ```
+
+Полный набор проверок приложения, миграций, зависимостей и базы перед выпуском описан в [RELEASE.md](RELEASE.md). Для dev-стенда добавляйте `-f compose.yaml -f compose.dev.yaml`.
 
 У каждого модуля, класса, функции и метода в собственном Python-коде должен быть русскоязычный docstring. Описание должно объяснять назначение и важные условия работы. Тест `spares.tests.test_docstrings` проверяет это правило при локальном прогоне.
 
 Устройство складского учёта, транзакций и интерфейса описано в [README приложения склада](spares/README.md). Правила сохранения истории схемы собраны в [README миграций](spares/migrations/README.md).
 
-## Локальный стенд через Docker Compose
+## Запуск Python без Docker
 
-1. Скопируйте `.env.example` в `.env` и заполните `SECRET_KEY` уникальным значением. Сгенерировать его можно командой `python -c "import secrets; print(secrets.token_urlsafe(64))"`.
-2. Соберите образ и примените миграции. Для новой базы создайте первого пользователя.
+Этот способ оставлен для локальной работы с SQLite. Нужен Python 3.13. Если в корне уже есть `.env` для Compose, `DATABASE_ENGINE=sqlite` явно выбирает файловую базу; используйте другой порт или остановите контейнер `web`, чтобы избежать конфликта.
 
-   ```sh
-   docker compose build
-   docker compose run --rm web python manage.py migrate --noinput
-   docker compose run --rm web python manage.py configure_warehouse_roles
-   docker compose run --rm web python manage.py createsuperuser
-   docker compose up -d
-   ```
+```powershell
+python -m venv .venv
+$env:DEBUG = '1'
+$env:DATABASE_ENGINE = 'sqlite'
+.venv/Scripts/python.exe -m pip install -r requirements.txt
+.venv/Scripts/python.exe manage.py migrate
+.venv/Scripts/python.exe manage.py configure_warehouse_roles
+.venv/Scripts/python.exe manage.py createsuperuser
+.venv/Scripts/python.exe manage.py runserver
+```
 
-3. Откройте `http://127.0.0.1:8000` на сервере. Контейнер слушает на loopback хоста, порт можно сменить через `WAREHOUSE_PORT`.
+В Linux и macOS используйте `.venv/bin/python` и `export DEBUG=1 DATABASE_ENGINE=sqlite`. Проверки из [инструкции выпуска](RELEASE.md) выполняются тем же интерпретатором вместо `docker compose exec web python`.
 
-Для боевого запуска используйте [инструкцию развёртывания](deploy/README.md). В ней описаны настройки HTTPS, первый запуск, обновление и восстановление базы.
+Если нужен локальный Python с PostgreSQL из Compose, запустите `db` с `compose.dev.yaml`, задайте `DATABASE_ENGINE=postgresql`, `POSTGRES_HOST=127.0.0.1`, `POSTGRES_PORT=5433` (либо выбранный `WAREHOUSE_DB_PORT`), остальные параметры возьмите из `.env`. Затем выполните миграции, настройку ролей и `runserver` тем же способом.
+
+SQLite-файл и прежний Docker-том `warehouse-data` не переносятся в PostgreSQL автоматически. Не удаляйте их до отдельного проверенного переноса. Команда `warehouse_database` обслуживает только SQLite; резервное копирование PostgreSQL описано в [инструкции развёртывания](deploy/README.md).

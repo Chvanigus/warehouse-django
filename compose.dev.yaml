@@ -1,0 +1,17 @@
+x-development-app: &development-app
+  environment:
+    DEBUG: "1"
+    WAREHOUSE_PRODUCTION: "0"
+    WAREHOUSE_HTTPS: "0"
+  volumes:
+    - .:/app
+
+services:
+  init:
+    <<: *development-app
+  web:
+    <<: *development-app
+    command: ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+  db:
+    ports:
+      - "127.0.0.1:${WAREHOUSE_DB_PORT:-5433}:5432"

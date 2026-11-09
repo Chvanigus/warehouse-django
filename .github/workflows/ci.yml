@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      COMPOSE_PROJECT_NAME: warehouse-ci-${{ github.run_id }}-${{ github.run_attempt }}
+      WAREHOUSE_IMAGE: warehouse-django:ci-${{ github.run_id }}-${{ github.run_attempt }}
+      WAREHOUSE_PORT: "8000"
+      WAREHOUSE_PUBLIC_HOST: warehouse.example.com
+      POSTGRES_DB: warehouse_ci
+      POSTGRES_USER: warehouse_ci
+      DEBUG: "0"
+      ALLOWED_HOSTS: localhost,127.0.0.1
+      WAREHOUSE_HTTPS: "0"
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Generate disposable database and Django credentials
+        id: credentials
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import os
+          import secrets
+
+          with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as environment:
+              for name in ('SECRET_KEY', 'POSTGRES_PASSWORD'):
+                  value = secrets.token_urlsafe(64)
+                  print(f'::add-mask::{value}')
+                  environment.write(f'{name}={value}\n')
+          PY
+
+      - name: Validate base, development and production Compose files
+        run: |
+          docker compose config --quiet
+          docker compose -f compose.yaml -f compose.dev.yaml config --quiet
+          docker compose -f compose.yaml -f compose.production.yaml config --quiet
+
+      - name: Build and start a clean PostgreSQL stack
+        run: |
+          docker compose build --pull
+          docker compose up --detach --wait --wait-timeout 180
+
+      - name: Check dependencies, Django and migrations
+        run: |
+          docker compose run --rm --no-deps -T web python -m pip check
+          docker compose run --rm --no-deps -T web python manage.py check
+          docker compose run --rm --no-deps -T web python manage.py makemigrations --check --dry-run
+
+      - name: Run the complete PostgreSQL test suite
+        run: docker compose run --rm --no-deps -T web python manage.py test --noinput
+
+      - name: Run the complete SQLite compatibility test suite
+        run: >-
+          docker compose run --rm --no-deps -T
+          -e DATABASE_ENGINE=sqlite -e DATABASE_PATH=/tmp/warehouse-ci.sqlite3
+          web python manage.py test --noinput
+
+      - name: Smoke test health, login and static files over HTTP
+        run: python3 deploy/smoke.py --base-url http://127.0.0.1:8000 --timeout 10
+
+      - name: Check Django production settings
+        run: >-
+          docker compose -f compose.yaml -f compose.production.yaml
+          run --rm --no-deps -T web
+          python manage.py check --deploy --fail-level ERROR
+
+      - name: Show container diagnostics on failure
+        if: failure() && steps.credentials.outcome == 'success'
+        run: |
+          docker compose ps --all
+          docker compose logs --no-color --tail 200
+
+      - name: Remove this run's containers and disposable volumes
+        if: always() && steps.credentials.outcome == 'success'
+        run: docker compose down --volumes --remove-orphans --timeout 20

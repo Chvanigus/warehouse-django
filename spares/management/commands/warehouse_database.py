@@ -71,7 +71,12 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.SUCCESS('Копия прошла проверку целостности.'))
                 return
 
-            if database['ENGINE'] != 'django.db.backends.sqlite3' or str(database['NAME']) == ':memory:':
+            if database['ENGINE'] != 'django.db.backends.sqlite3':
+                raise CommandError(
+                    'Команда поддерживает только файловую базу SQLite. '
+                    'Для PostgreSQL используйте pg_dump и pg_restore.',
+                )
+            if str(database['NAME']) == ':memory:':
                 raise CommandError('Команда поддерживает только файловую базу SQLite.')
             database_path = Path(database['NAME'])
             if action == 'backup':

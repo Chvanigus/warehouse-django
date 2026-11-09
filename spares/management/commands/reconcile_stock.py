@@ -5,6 +5,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.db.models import Count
 
+from spares.database_lock import lock_warehouse_writes
 from spares.models import Stock
 
 
@@ -60,6 +61,7 @@ class Command(BaseCommand):
 
     def merge(self, ids):
         """Сложить количества всей группы после проверки совместимости и удалить лишние записи."""
+        lock_warehouse_writes()
         retained = Stock.objects.select_for_update().filter(pk=ids[0]).first()
         if retained is None:
             raise CommandError(f'Остаток #{ids[0]} не найден.')

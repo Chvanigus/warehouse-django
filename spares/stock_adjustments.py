@@ -5,6 +5,7 @@ from decimal import Decimal
 from django.core.exceptions import ValidationError
 from django.db import router, transaction
 
+from .database_lock import lock_warehouse_writes
 from .models import Stock, StockAdjustment
 from .validators import require_operation_actor
 
@@ -37,6 +38,7 @@ def record_manual_stock(stock, *, actor, reason):
     using = router.db_for_write(Stock, instance=stock)
     opening = stock._state.adding
     with transaction.atomic(using=using):
+        lock_warehouse_writes(using)
         before = Decimal('0.00')
         if opening:
             stock.input_quantity = stock.output_quantity = 0

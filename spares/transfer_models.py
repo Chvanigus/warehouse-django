@@ -8,6 +8,7 @@ from django.core.validators import MinValueValidator
 from django.db import models, router, transaction
 from django.utils import timezone
 
+from .database_lock import lock_warehouse_writes
 from .mixins import CompanyMixin, MeasureMixin, PriceMixin, SpareMixin
 from .models import Stock, Warehouses
 from .validators import require_operation_actor, validate_posting_date
@@ -101,6 +102,7 @@ def post_transfer(*, source, destination, quantity, date, actor, note=''):
     note = StockTransfer._meta.get_field('note').clean((note or '').strip(), None)
     using = router.db_for_write(Stock, instance=source)
     with transaction.atomic(using=using):
+        lock_warehouse_writes(using)
         stocks = Stock.objects.using(using).select_for_update()
         try:
             source = stocks.get(pk=source.pk)
@@ -135,6 +137,7 @@ def cancel_transfer(transfer, *, actor, reason):
     reason = StockTransfer._meta.get_field('cancellation_reason').clean(reason, transfer)
     using = router.db_for_write(StockTransfer, instance=transfer)
     with transaction.atomic(using=using):
+        lock_warehouse_writes(using)
         try:
             transfer = StockTransfer.objects.using(using).select_for_update().get(pk=transfer.pk)
         except StockTransfer.DoesNotExist as error:

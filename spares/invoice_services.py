@@ -4,6 +4,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 
+from .database_lock import lock_warehouse_writes
 from .invoice_models import ReceiptInvoice
 from .models import Receipt
 
@@ -48,6 +49,7 @@ def invoice_version(header, number_key):
 @transaction.atomic
 def post_receipt_invoice(*, actor, header, lines, preview_version=None):
     """Сохранить накладную со всеми приходами после проверок даты, строк, номера и версии."""
+    lock_warehouse_writes()
     if header['date'] > timezone.localdate():
         raise ValidationError('Нельзя провести накладную будущей датой.')
     validate_invoice_lines(lines)
@@ -69,6 +71,7 @@ def post_receipt_invoice(*, actor, header, lines, preview_version=None):
 @transaction.atomic
 def cancel_receipt_invoice(*, pk, actor, reason):
     """Отменить все приходы накладной и сохранить реквизиты отмены одной транзакцией."""
+    lock_warehouse_writes()
     invoice = ReceiptInvoice.objects.select_for_update().get(pk=pk)
     if invoice.cancelled_at is not None:
         raise ValidationError('Накладная уже отменена.')

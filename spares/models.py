@@ -8,6 +8,7 @@ from django.core.validators import MinValueValidator
 from django.db import models, router, transaction
 from django.utils import timezone
 
+from spares.database_lock import lock_warehouse_writes
 from spares.mixins import (
     CompanyMixin,
     MachinesWorkersTrailersMixin,
@@ -189,6 +190,7 @@ class StockOperation(CompanyMixin, SpareMixin, MeasureMixin, WarehouseMixin, Pri
             return None
         entries = type(self).objects.using(using)
         if lock:
+            lock_warehouse_writes(using)
             entries = entries.select_for_update()
         return entries.filter(pk=self.pk).first()
 
@@ -259,6 +261,7 @@ class StockOperation(CompanyMixin, SpareMixin, MeasureMixin, WarehouseMixin, Pri
 
         using = using or router.db_for_write(type(self), instance=self)
         with transaction.atomic(using=using):
+            lock_warehouse_writes(using)
             previous = self._stored(using, lock=True)
             self._validate_posting(previous, using, update_fields)
             setattr(self, self.total_field, self._total_for_save(previous, update_fields))
@@ -292,6 +295,7 @@ class StockOperation(CompanyMixin, SpareMixin, MeasureMixin, WarehouseMixin, Pri
 
         using = router.db_for_write(type(self), instance=self)
         with transaction.atomic(using=using):
+            lock_warehouse_writes(using)
             previous = self._stored(using, lock=True)
             if previous is None or previous.cancelled_at is not None:
                 raise ValidationError('Документ уже отменён или отсутствует.')
@@ -376,6 +380,7 @@ class Stock(CompanyMixin, SpareMixin, MeasureMixin, WarehouseMixin, PriceMixin):
             return
         matches = cls.matching(operation, using)
         if persist:
+            lock_warehouse_writes(using)
             matches = matches.select_for_update()
         try:
             stock = matches.get()
@@ -433,6 +438,7 @@ class Stock(CompanyMixin, SpareMixin, MeasureMixin, WarehouseMixin, PriceMixin):
                 return
         using = using or router.db_for_write(type(self), instance=self)
         with transaction.atomic(using=using):
+            lock_warehouse_writes(using)
             previous = Stock.objects.using(using).select_for_update().filter(pk=self.pk).first()
             self._validate_key(previous, using, update_fields)
             if update_fields is None or previous is None:

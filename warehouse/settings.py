@@ -103,14 +103,36 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'warehouse.wsgi.application'
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': os.getenv('DATABASE_PATH') or BASE_DIR / 'db.sqlite3',
-        # Блокировка записи нужна до чтения остатка при складской операции.
-        'OPTIONS': {'timeout': 20, 'transaction_mode': 'IMMEDIATE'},
+
+def database_config():
+    """Выбирает PostgreSQL по явному флагу или сохраняет файловый SQLite для локального запуска."""
+    engine = os.getenv('DATABASE_ENGINE', 'sqlite').strip().lower()
+    if engine == 'sqlite':
+        return {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': os.getenv('DATABASE_PATH') or BASE_DIR / 'db.sqlite3',
+            # Блокировка записи нужна до чтения остатка при складской операции.
+            'OPTIONS': {'timeout': 20, 'transaction_mode': 'IMMEDIATE'},
+        }
+    if engine != 'postgresql':
+        raise ImproperlyConfigured('DATABASE_ENGINE должен иметь значение sqlite или postgresql.')
+
+    required = ('POSTGRES_DB', 'POSTGRES_USER', 'POSTGRES_PASSWORD')
+    missing = [name for name in required if not os.getenv(name)]
+    if missing:
+        raise ImproperlyConfigured('Для PostgreSQL задайте переменные: ' + ', '.join(missing) + '.')
+    return {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.environ['POSTGRES_DB'],
+        'USER': os.environ['POSTGRES_USER'],
+        'PASSWORD': os.environ['POSTGRES_PASSWORD'],
+        'HOST': os.getenv('POSTGRES_HOST') or 'localhost',
+        'PORT': os.getenv('POSTGRES_PORT') or '5432',
+        'OPTIONS': {'connect_timeout': 5},
     }
-}
+
+
+DATABASES = {'default': database_config()}
 
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
