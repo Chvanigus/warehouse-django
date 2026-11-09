@@ -82,11 +82,55 @@ jobs:
           run --rm --no-deps -T web
           python manage.py check --deploy --fail-level ERROR
 
+      - name: Start and smoke test the read-only production runtime
+        env:
+          WAREHOUSE_PORT: "18080"
+          WAREHOUSE_PUBLIC_HOST: warehouse.example.com
+        shell: bash
+        run: |
+          production() {
+            docker compose -p "${COMPOSE_PROJECT_NAME}-production" \
+              -f compose.yaml -f compose.production.yaml "$@"
+          }
+          production up --no-build --detach --wait --wait-timeout 180
+          production exec -T web python -c "import os; assert os.getuid() != 0, 'Production must run as a non-root user'"
+          container="$(production ps -q web)"
+          test "$(docker inspect --format '{{.HostConfig.ReadonlyRootfs}}' "$container")" = true
+          python3 deploy/smoke.py --base-url http://127.0.0.1:18080 \
+            --host warehouse.example.com --forwarded-https --timeout 10
+          runtime_logs="$(production logs --no-color web)"
+          printf '%s\n' "$runtime_logs"
+          if grep -Eiq '\[(ERROR|CRITICAL)\]|Control server error|Permission[[:space:]]+denied' <<< "$runtime_logs"; then
+            echo '::error::Production runtime logged an error despite successful HTTP health checks'
+            exit 1
+          fi
+
       - name: Show container diagnostics on failure
         if: failure() && steps.credentials.outcome == 'success'
         run: |
           docker compose ps --all
           docker compose logs --no-color --tail 200
+
+      - name: Show production runtime diagnostics on failure
+        if: failure() && steps.credentials.outcome == 'success'
+        env:
+          WAREHOUSE_PORT: "18080"
+          WAREHOUSE_PUBLIC_HOST: warehouse.example.com
+        run: |
+          docker compose -p "${COMPOSE_PROJECT_NAME}-production" \
+            -f compose.yaml -f compose.production.yaml ps --all
+          docker compose -p "${COMPOSE_PROJECT_NAME}-production" \
+            -f compose.yaml -f compose.production.yaml logs --no-color --tail 200
+
+      - name: Remove this run's production containers and disposable volumes
+        if: always() && steps.credentials.outcome == 'success'
+        env:
+          WAREHOUSE_PORT: "18080"
+          WAREHOUSE_PUBLIC_HOST: warehouse.example.com
+        run: >-
+          docker compose -p "${COMPOSE_PROJECT_NAME}-production"
+          -f compose.yaml -f compose.production.yaml
+          down --volumes --remove-orphans --timeout 20
 
       - name: Remove this run's containers and disposable volumes
         if: always() && steps.credentials.outcome == 'success'

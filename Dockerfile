@@ -1,7 +1,7 @@
 FROM python:3.13.18-slim-bookworm
 
 LABEL org.opencontainers.image.title="Warehouse Django" \
-    org.opencontainers.image.version="1.0.0" \
+    org.opencontainers.image.version="1.0.1" \
     org.opencontainers.image.source="https://github.com/Chvanigus/warehouse-django"
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -19,4 +19,4 @@ USER warehouse
 RUN DEBUG=1 python manage.py collectstatic --noinput
 
 EXPOSE 8000
-CMD ["sh", "-ec", "python manage.py migrate --check && exec gunicorn --bind 0.0.0.0:8000 --workers \"${GUNICORN_WORKERS:-2}\" --threads \"${GUNICORN_THREADS:-4}\" --access-logfile - --error-logfile - warehouse.wsgi:application"]
+CMD ["sh", "-ec", "python manage.py migrate --check && exec gunicorn --no-control-socket --bind 0.0.0.0:8000 --workers \"${GUNICORN_WORKERS:-2}\" --threads \"${GUNICORN_THREADS:-4}\" --access-logfile - --error-logfile - warehouse.wsgi:application"]

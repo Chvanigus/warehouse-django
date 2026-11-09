@@ -5,7 +5,7 @@ x-database-environment: &database-environment
 
 x-app: &app
   build: .
-  image: ${WAREHOUSE_IMAGE:-warehouse-django:1.0.0}
+  image: ${WAREHOUSE_IMAGE:-warehouse-django:1.0.1}
   init: true
   environment:
     <<: *database-environment

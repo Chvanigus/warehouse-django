@@ -68,6 +68,10 @@ def verify(base_url, *, host=None, forwarded_https=False, timeout=10):
     if content_type != 'text/css' or not stylesheet.strip():
         raise SmokeError('Статические файлы: CSS не выдан или содержит пустой ответ.')
 
+    icons, content_type = fetch(base_url, 'static/images/ui-icons.svg', headers, timeout)
+    if content_type != 'image/svg+xml' or not icons.strip():
+        raise SmokeError('Статические файлы: SVG-иконки не выданы или содержат пустой ответ.')
+
 
 def main():
     """Читает параметры HTTP-проверки и возвращает ненулевой код при отказе."""
@@ -88,7 +92,7 @@ def main():
     except (OSError, URLError, ValueError, SmokeError) as error:
         print(f'Smoke check failed: {error}', file=sys.stderr)
         return 1
-    print('Smoke check OK: health, login, static CSS.')
+    print('Smoke check OK: health, login, static CSS and SVG.')
     return 0
 
 
